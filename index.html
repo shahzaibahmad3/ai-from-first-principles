@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI, From First Principles</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:      #EEF1F4;
+    --panel:   #FFFFFF;
+    --panel-2: #F4F6F9;
+    --ink:     #16202B;
+    --muted:   #5A6A78;
+    --hair:    #DCE2E9;
+    --c1:      #DE8B27;
+    --c0:      #2E6FB0;
+    --accent:  #DE8B27;
+    --shadow:  0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C141C; --panel: #111C26; --panel-2: #0F1922;
+      --ink: #E8EEF3; --muted: #8397A6; --hair: #1E2C38;
+      --c1: #F0A840; --c0: #4C9BE0; --accent: #F0A840;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#EEF1F4; --panel:#FFFFFF; --panel-2:#F4F6F9; --ink:#16202B; --muted:#5A6A78; --hair:#DCE2E9;
+    --c1:#DE8B27; --c0:#2E6FB0; --accent:#DE8B27;
+    --shadow:0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+    --c1:#F0A840; --c0:#4C9BE0; --accent:#F0A840;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: clamp(20px, 5vw, 60px);
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--accent); display: inline-block; }
+  h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.08; margin: 0 0 14px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 16px; max-width: 62ch; margin: 0 0 40px; }
+  .sub b { color: var(--ink); }
+  .posts { display: flex; flex-direction: column; gap: 14px; }
+  .post {
+    display: block; background: var(--panel); border: 1px solid var(--hair);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 20px 22px;
+    text-decoration: none; color: inherit; transition: border-color .15s;
+  }
+  .post:hover { border-color: var(--accent); }
+  .post .n {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700;
+  }
+  .post h2 { font-size: 20px; margin: 6px 0 6px; letter-spacing: -0.01em; }
+  .post p { color: var(--muted); font-size: 14.5px; margin: 0; }
+  .post .tag {
+    display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 11px;
+    color: var(--muted); border: 1px solid var(--hair); border-radius: 999px; padding: 3px 10px;
+  }
+  .post.soon { opacity: .5; }
+  .post.soon:hover { border-color: var(--hair); }
+  footer {
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">a series on the actual mechanics of the models we use</div>
+  <h1>AI, From First Principles</h1>
+  <p class="sub">I use AI heavily, every day, for real work. This is me making the machinery
+    underneath it concrete, one genuinely-understood idea at a time — with something you can
+    <b>run</b>, not just read, for every claim.</p>
+
+  <div class="posts">
+    <a class="post" href="neuron/">
+      <span class="n">Part 1</span>
+      <h2>The Neuron — the unit an LLM is built from</h2>
+      <p>Every large language model is built from millions of copies of one simple unit.
+        Watch it learn a straight line — then watch it hit a wall (XOR) that one line can't cross.</p>
+      <span class="tag">interactive playground</span>
+    </a>
+
+    <div class="post soon">
+      <span class="n">Part 2</span>
+      <h2>Why one line wasn't enough</h2>
+      <p>The fix for the XOR wall, and where the "deep" in deep learning comes from. Coming soon.</p>
+    </div>
+  </div>
+
+  <footer>
+    Code for every post: <a href="https://github.com/shahzaibahmad3/ai-from-first-principles">github.com/shahzaibahmad3/ai-from-first-principles</a>
+  </footer>
+</div>
+</body>
+</html>
