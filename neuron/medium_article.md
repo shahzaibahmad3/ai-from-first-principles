@@ -2,12 +2,9 @@
 
 ### Part 1 of *AI, from first principles*: the single idea underneath every large language model, explained from scratch — with a playground you can run and code for every claim.
 
-![A single neuron draws one straight line — its power and its ceiling](image.png)
+![A single neuron draws one straight line — its power and its ceiling](https://raw.githubusercontent.com/shahzaibahmad3/ai-from-first-principles/main/neuron/image.png)
 
-> **There's a playground for this.** Open [`index.html`](index.html) in any browser
-> (just double-click it — no install, no server). Press **Run** and watch one neuron teach itself
-> to separate two groups of dots. Then load **XOR** and watch it hit a wall it can't cross.
-> Everything below explains what you're seeing.
+> **There's a playground for this.** Open it at [shahzaibahmad3.github.io/ai-from-first-principles/neuron](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/) — no install, nothing to set up. Press **Run** and watch one neuron teach itself to separate two groups of dots. Then load **XOR** and watch it hit a wall it can't cross. Everything below explains what you're seeing.
 
 ---
 
@@ -77,7 +74,7 @@ The `learning_rate` just sets how big each shove is. And there's a guarantee wor
 
 ## Go watch it
 
-Open [`index.html`](index.html) for a minute.
+Open the [playground](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/) for a minute.
 
 - **Two clusters / Diagonal** → press **Run**. The line sweeps in and the misses hit 0.
 - **Add your own points** → click empty space to drop dots, then Run. However you scatter two groups, if a line *can* separate them, the neuron finds it.
@@ -117,7 +114,7 @@ But the unit doing the work in every layer is exactly the one you just played wi
 
 ## The code — all 30 lines of it
 
-The playground and this whole post run on [`src/neuron.py`](src/neuron.py), which uses no libraries at all. The forward pass:
+The playground and this whole post run on [`neuron.py`](https://github.com/shahzaibahmad3/ai-from-first-principles/blob/main/neuron/src/neuron.py), which uses no libraries at all. The forward pass:
 
 ```python
 def predict(weights, bias, point):
@@ -141,26 +138,12 @@ if error != 0:
 Run it and you'll see AND solved in two passes and XOR give up after a hundred:
 
 ```bash
+git clone https://github.com/shahzaibahmad3/ai-from-first-principles
+cd ai-from-first-principles/neuron
 python3 src/neuron.py
 ```
 
 If you can read those two snippets, you understand the unit an LLM is built from — the real thing, not a simplified cartoon of it.
-
----
-
-## Run everything yourself
-
-```bash
-# the interactive playground — no dependencies, just open it
-open index.html          # (or double-click the file)
-
-# the reference implementation — pure Python, no libraries
-python3 src/neuron.py
-
-# regenerate the figure at the top of this page
-pip install -r requirements.txt
-python3 src/figure.py
-```
 
 ---
 
@@ -169,6 +152,9 @@ python3 src/figure.py
 This is the foundation of a series that works from this one unit up to modern models, one genuinely-understood idea at a time. The single neuron here becomes a *layer*, layers *stack* into a network, and the trick that lets you train those hidden layers — backpropagation — is what turns this small idea into something that can write code.
 
 But it all starts with one line, moving until it's right.
+
+**Play with it yourself:** [shahzaibahmad3.github.io/ai-from-first-principles/neuron](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/)
+**Full code:** [github.com/shahzaibahmad3/ai-from-first-principles](https://github.com/shahzaibahmad3/ai-from-first-principles)
 
 ## Sources & further reading
 
@@ -181,3 +167,5 @@ But it all starts with one line, moving until it's right.
 ---
 
 **Next → Why one line wasn't enough: the XOR wall, and the fix everything since is built on.**
+
+*This is Part 1 of "AI, from first principles" — I use AI heavily, every day, for real work. This series is me making the machinery underneath it concrete, one genuinely-understood idea at a time.*

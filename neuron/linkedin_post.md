@@ -14,7 +14,7 @@ A weighted sum, then a yes/no.
 
 Here's where it stops being obvious. A neuron isn't handed those weights. It finds them itself: it guesses, checks whether it was right, and when it's wrong it nudges each weight a little — toward the answer it should have given. Repeat, and it tunes itself into a working decision-maker.
 
-I built a small playground so you can watch this (link below). A single neuron, drawn as geometry, is really just a straight line — everything on one side "fire," everything on the other "quiet." Press Run and watch it slide and tilt that line, correcting itself on every mistake, until it cleanly splits two clouds of points.
+I built a small playground so you can watch this (link in comments). A single neuron, drawn as geometry, is really just a straight line — everything on one side "fire," everything on the other "quiet." Press Run and watch it slide and tilt that line, correcting itself on every mistake, until it cleanly splits two clouds of points.
 
 Then try the dataset marked XOR, and watch it fail. Forever. One neuron can only draw ONE straight line, and some patterns can't be split by a single straight cut, no matter how you tilt it.
 
