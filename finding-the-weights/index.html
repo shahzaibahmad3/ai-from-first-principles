@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finding the weights — the part that was actually hard</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:      #EEF1F4;
+    --panel:   #FFFFFF;
+    --panel-2: #F4F6F9;
+    --grid:    #D7DDE5;
+    --axis:    #B7C0CB;
+    --ink:     #16202B;
+    --muted:   #5A6A78;
+    --hair:    #DCE2E9;
+    --c1:      #DE8B27;   /* target 1 (amber) */
+    --c0:      #2E6FB0;   /* target 0 (slate blue) */
+    --c1-fill: rgba(222,139,39,0.12);
+    --c0-fill: rgba(46,111,176,0.10);
+    --line:    #16202B;
+    --accent:  #DE8B27;
+    --good:    #1F8A5B;
+    --bad:     #C6462F;
+    --shadow:  0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #0C141C;
+      --panel:   #111C26;
+      --panel-2: #0F1922;
+      --grid:    #1C2A36;
+      --axis:    #2A3B49;
+      --ink:     #E8EEF3;
+      --muted:   #8397A6;
+      --hair:    #1E2C38;
+      --c1:      #F0A840;
+      --c0:      #4C9BE0;
+      --c1-fill: rgba(240,168,64,0.15);
+      --c0-fill: rgba(76,155,224,0.13);
+      --line:    #E8EEF3;
+      --accent:  #F0A840;
+      --good:    #35B87E;
+      --bad:     #E5674B;
+      --shadow:  0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg:#EEF1F4; --panel:#FFFFFF; --panel-2:#F4F6F9; --grid:#D7DDE5; --axis:#B7C0CB;
+    --ink:#16202B; --muted:#5A6A78; --hair:#DCE2E9;
+    --c1:#DE8B27; --c0:#2E6FB0; --c1-fill:rgba(222,139,39,0.12); --c0-fill:rgba(46,111,176,0.10);
+    --line:#16202B; --accent:#DE8B27; --good:#1F8A5B; --bad:#C6462F;
+    --shadow:0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --grid:#1C2A36; --axis:#2A3B49;
+    --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+    --c1:#F0A840; --c0:#4C9BE0; --c1-fill:rgba(240,168,64,0.15); --c0-fill:rgba(76,155,224,0.13);
+    --line:#E8EEF3; --accent:#F0A840; --good:#35B87E; --bad:#E5674B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: clamp(14px, 3vw, 34px);
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  .theme-toggle {
+    float: right; font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; border-radius: 999px; padding: 7px 13px; cursor: pointer;
+    background: var(--panel); color: var(--muted); border: 1px solid var(--hair);
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--accent); display: inline-block; }
+  h1 {
+    font-size: clamp(23px, 4vw, 34px); line-height: 1.1; margin: 0 0 10px;
+    letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .sub { color: var(--muted); font-size: 15px; max-width: 68ch; margin: 0 0 18px; }
+  .sub b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- layout ---------- */
+  .instrument {
+    display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .95fr); gap: 16px;
+  }
+  @media (max-width: 900px) { .instrument { grid-template-columns: 1fr; } }
+  .deck { display: flex; flex-direction: column; gap: 12px; }
+
+  .screen-wrap {
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .screen {
+    position: relative; width: 100%; aspect-ratio: 1 / 1;
+    border-radius: 9px; overflow: hidden; background: var(--panel-2);
+  }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .status { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 20px;
+            display: flex; align-items: center; gap: 9px; }
+  .status b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .status.solved .dot { background: var(--good); }
+  .status.solved { color: var(--good); }
+  .status.stuck .dot { background: var(--bad); }
+  .status.stuck { color: var(--bad); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--mono);
+            font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 14px;
+  }
+  .card h2, .net-panel h2 {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin: 0 0 11px;
+  }
+  .net-panel { padding-top: 12px; border-top: 1px solid var(--hair); }
+
+  /* ---------- controls ---------- */
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .presets button {
+    font-family: var(--sans); font-size: 13px; text-align: left; cursor: pointer;
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--hair);
+    border-radius: 9px; padding: 9px 11px; line-height: 1.25;
+  }
+  .presets button:hover { border-color: var(--muted); }
+  .presets button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .presets .k { display: block; font-weight: 600; }
+  .presets .d { display: block; font-size: 11px; color: var(--muted); }
+
+  .transport { display: flex; gap: 8px; }
+  .transport button {
+    flex: 1; font-family: var(--mono); font-size: 12px; letter-spacing: .06em;
+    text-transform: uppercase; cursor: pointer; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 9px; padding: 11px 8px;
+  }
+  .transport button:hover { border-color: var(--muted); }
+  #run { background: var(--accent); border-color: var(--accent); color: #1a1206; font-weight: 700; }
+  #run:hover { filter: brightness(1.05); }
+
+  .seg { display: flex; gap: 8px; }
+  .seg button {
+    flex: 1; font-family: var(--mono); font-size: 12px; text-transform: uppercase; cursor: pointer;
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--hair);
+    border-radius: 9px; padding: 10px 8px;
+  }
+  .seg button:hover { border-color: var(--muted); }
+  .seg button[aria-pressed="true"] {
+    border-color: var(--accent); background: var(--accent); color: #1a1206; font-weight: 700;
+  }
+
+  .slider { margin-top: 12px; }
+  .slider label {
+    display: flex; justify-content: space-between; font-family: var(--mono);
+    font-size: 11.5px; color: var(--muted); margin-bottom: 6px;
+  }
+  .slider label b { color: var(--ink); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+  .ghost-btn {
+    width: 100%; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .06em; cursor: pointer; background: transparent; color: var(--muted);
+    border: 1px solid var(--hair); border-radius: 9px; padding: 10px 8px;
+  }
+  .ghost-btn:hover { color: var(--ink); border-color: var(--muted); }
+  .ghost-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .ghost-btn:disabled:hover { color: var(--muted); border-color: var(--hair); }
+  .ghost-btn + .ghost-btn { margin-top: 8px; }
+  .accent-btn { color: var(--ink); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+  .hint { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+
+  /* ---------- readout ---------- */
+  .gauges { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .gauge { background: var(--panel-2); border: 1px solid var(--hair); border-radius: 9px; padding: 9px 10px; }
+  .gauge .lab { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+                text-transform: uppercase; color: var(--muted); }
+  .gauge .val { font-family: var(--mono); font-size: 20px; font-weight: 600;
+                font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .solved #g-state .val { color: var(--good); }
+  .stuck  #g-state .val { color: var(--bad); }
+
+  .divider { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); }
+  .calc-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+                text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+  /* the four-row truth table: outputs vs targets */
+  .io { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .io-head, .io-row { display: grid; grid-template-columns: 34px 34px 1fr 1fr; gap: 6px; align-items: center; }
+  .io-head { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--muted); margin-bottom: 5px; }
+  .io-row { padding: 3px 0; border-top: 1px solid var(--hair); }
+  .io-row .t { color: var(--muted); }
+  .io-row .o { text-align: right; font-weight: 600; }
+  .io-row.ok  .o { color: var(--good); }
+  .io-row.bad .o { color: var(--bad); }
+  .io-row.hedge { background: color-mix(in srgb, var(--bad) 9%, transparent); border-radius: 5px; }
+  .io-row.hedge .o::after { content: " hedge"; font-size: 9.5px; font-weight: 400; letter-spacing: .06em; }
+
+  /* the lottery tally */
+  .tally { display: flex; align-items: baseline; gap: 8px; font-family: var(--mono);
+           font-variant-numeric: tabular-nums; }
+  .tally .big { font-size: 22px; font-weight: 600; }
+  .tally .small { font-size: 11.5px; color: var(--muted); }
+
+  /* the batch-sweep result table */
+  .sweep { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .sweep-row { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 6px;
+               padding: 4px 0; border-top: 1px solid var(--hair); align-items: center; }
+  .sweep-head { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 6px;
+                font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+                color: var(--muted); margin-bottom: 4px; }
+  .sweep-row .n { color: var(--muted); }
+  .sweep-row .r { font-weight: 600; text-align: right; }
+  .bar { height: 5px; border-radius: 3px; background: var(--hair); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .sweep-row.cur .n { color: var(--ink); font-weight: 600; }
+
+  #spark { width: 100%; height: 46px; display: block; }
+
+  /* ---------- network diagram ---------- */
+  #net { display: block; margin: 0 auto; overflow: visible; width: 100%; height: auto; }
+  .nd-node { fill: var(--panel-2); stroke: var(--hair); stroke-width: 2;
+             transition: stroke 200ms, fill 200ms; }
+  .nd-in    { stroke: var(--axis); }
+  .nd-hid   { stroke: var(--accent); }
+  .nd-out   { stroke: var(--accent); }
+  .nd-lbl   { font-family: var(--mono); font-weight: 700; fill: var(--ink); }
+  .nd-num   { font-family: var(--mono); font-size: 10px; font-weight: 600; fill: var(--muted);
+              font-variant-numeric: tabular-nums; }
+  .nd-cap   { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+              text-transform: uppercase; fill: var(--muted); }
+  .nd-edge  { transition: stroke-width 160ms, stroke 200ms; }
+  @keyframes ndPulse { 0% { stroke-width: 6; } 100% { stroke-width: 2; } }
+  .nd-pulse { animation: ndPulse 460ms ease-out; }
+  @keyframes edgePulse { 0% { stroke-opacity: 1; } 100% { stroke-opacity: .55; } }
+  .edge-pulse { animation: edgePulse 460ms ease-out; }
+
+  /* The diagram scales with its viewBox, so once the layout goes single-column it
+     renders at roughly half size and these labels drop to ~5px. Sizes here are in
+     viewBox units, chosen to land back near 9–11px on a phone. */
+  @media (max-width: 900px) {
+    .nd-num { font-size: 18px; }
+    .nd-cap { font-size: 16px; letter-spacing: .04em; }
+    .nd-lbl { font-size: 24px; }
+  }
+
+  .hide { display: none !important; }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  footer {
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--accent); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
+    <div class="eyebrow">AI, from first principles &middot; part 2</div>
+    <h1>Finding the weights</h1>
+    <p class="sub">One neuron draws one straight line, so it can't do XOR. Add a hidden layer and the
+      boundary <b>bends</b> &mdash; and XOR becomes solvable with nine numbers you can write down by
+      hand. So try to <b>find</b> those numbers from a random start. About a quarter of the time,
+      gradient descent never gets there.</p>
+  </header>
+
+  <div class="instrument">
+    <!-- ============ LEFT ============ -->
+    <div class="screen-wrap">
+      <div class="screen"><canvas id="cv"></canvas></div>
+
+      <div class="status" id="status">
+        <span class="dot"></span><span id="statusText">Ready. Press Run to train from a random start.</span>
+      </div>
+
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--c1)"></span>target 1</span>
+        <span><span class="swatch" style="background:var(--c0)"></span>target 0</span>
+        <span><span class="swatch" style="background:var(--c1-fill);border:1px solid var(--c1)"></span>network says 1</span>
+        <span><span class="swatch" style="height:0;border-top:2px dashed var(--muted);border-radius:0"></span>a hidden unit's line</span>
+      </div>
+
+      <div class="net-panel">
+        <h2>The network</h2>
+        <svg id="net" viewBox="0 0 620 236" role="img"
+             aria-label="A 2-input, N-hidden-unit, 1-output network. Edge thickness shows weight size; colour shows sign."></svg>
+      </div>
+
+      <div class="card" id="lotteryCard">
+        <h2>The lottery</h2>
+        <div class="tally">
+          <span class="big" id="tallyRate">&mdash;</span>
+          <span class="small" id="tallyText">no attempts yet</span>
+        </div>
+        <button class="ghost-btn accent-btn" id="reroll" type="button" style="margin-top:11px">New random init</button>
+        <button class="ghost-btn" id="byHand" type="button">Solve it by hand instead</button>
+        <p class="hint" id="lotteryHint">Same architecture, same learning rate, different starting
+          weights. Run a few and watch the rate settle near 74%.</p>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT ============ -->
+    <div class="deck">
+      <div class="card">
+        <h2>Problem</h2>
+        <div class="presets" id="presets">
+          <button data-set="xor" aria-pressed="true"><span class="k">XOR</span><span class="d">4 points &middot; the famous one</span></button>
+          <button data-set="and"><span class="k">AND</span><span class="d">4 points &middot; one line is enough</span></button>
+          <button data-set="cloud"><span class="k">XOR cloud</span><span class="d">the same wall, real data</span></button>
+          <button data-set="rings"><span class="k">Rings</span><span class="d">needs real curvature</span></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Hidden units</h2>
+        <div class="seg" id="widthToggle">
+          <button data-h="2" aria-pressed="true">2</button>
+          <button data-h="3">3</button>
+          <button data-h="4">4</button>
+          <button data-h="8">8</button>
+        </div>
+        <p class="hint" id="widthHint">2 units already represent XOR exactly. Anything more adds
+          <b>no</b> representational power &mdash; only more routes downhill.</p>
+      </div>
+
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="transport">
+          <button id="run" type="button">Run</button>
+          <button id="step" type="button">Step</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+        <div class="slider">
+          <label for="speed">Speed <b id="speedVal">medium</b></label>
+          <input type="range" id="speed" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="slider">
+          <label for="lr">Learning rate <b id="lrVal">1.00</b></label>
+          <input type="range" id="lr" min="5" max="300" step="5" value="100">
+        </div>
+      </div>
+
+      <div class="card" id="sweepCard">
+        <h2>Or run 100 at once</h2>
+        <button class="ghost-btn" id="sweepBtn" type="button">Run 100 inits &times; 4 widths</button>
+        <div class="divider" id="sweepWrap">
+          <div class="sweep" id="sweep">
+            <div class="sweep-head"><span>hidden</span><span>solve rate</span><span>&nbsp;</span></div>
+            <div id="sweepRows"></div>
+          </div>
+          <p class="hint" id="sweepHint">Runs entirely in this tab. Reproduces the shape of the
+            measurement in the write-up.</p>
+        </div>
+      </div>
+
+      <div class="card" id="gaugeCard">
+        <h2>Live readout</h2>
+        <div class="gauges">
+          <div class="gauge"><div class="lab">Epoch</div><div class="val" id="v-epoch">0</div></div>
+          <div class="gauge"><div class="lab">Loss</div><div class="val" id="v-loss">&mdash;</div></div>
+          <div class="gauge" id="g-state"><div class="lab" id="lab-state">Solved</div><div class="val" id="v-state">&mdash;</div></div>
+        </div>
+
+        <div class="divider" id="ioWrap">
+          <div class="calc-label">Output vs target</div>
+          <div class="io">
+            <div class="io-head"><span>x&#8321;</span><span>x&#8322;</span><span>want</span><span style="text-align:right">got</span></div>
+            <div id="ioRows"></div>
+          </div>
+        </div>
+
+        <div class="divider hide" id="accWrap">
+          <div class="calc-label">Points classified correctly</div>
+          <div class="tally"><span class="big" id="v-acc">&mdash;</span><span class="small" id="v-accText"></span></div>
+        </div>
+
+        <div class="divider">
+          <div class="calc-label">Loss across epochs (log scale)</div>
+          <canvas id="spark"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="footerNote">Same backprop as src/credit_assignment.py &middot; sigmoid units, full-batch gradient descent, no libraries.</span>
+    <span>Part of <a href="../">AI, from first principles</a></span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const spark = document.getElementById("spark");
+  const sctx = spark.getContext("2d");
+  const net = document.getElementById("net");
+
+  const S = { css: 0 };
+  const SP = { css: 0, cssH: 46 };
+
+  // View window. The logic problems live on the unit square, so we frame that
+  // with a margin rather than centring on the origin.
+  const D0 = -0.35, D1 = 1.35;
+  const SPAN = D1 - D0;
+
+  // Surface is computed at this resolution offscreen and scaled up, which keeps
+  // the per-frame forward-pass count flat regardless of canvas size.
+  const SURF = 72;
+  const surf = document.createElement("canvas");
+  surf.width = SURF; surf.height = SURF;
+  const surfCtx = surf.getContext("2d");
+  const surfImg = surfCtx.createImageData(SURF, SURF);
+
+  const MAX_EPOCHS = 20000;         // matches credit_assignment.py
+  // Tuned against the real epoch counts: a typical solve lands around 4,000–5,000
+  // epochs and a stuck run has to go the full 20,000 (the plateau creeps downward
+  // too slowly to call early without risking a false verdict), so the default needs
+  // to make 20,000 epochs watchable rather than tedious.
+  const epochsPerFrame = { 1: 1, 2: 10, 3: 40, 4: 120, 5: 400 };
+  const SPEED_NAME = ["", "one at a time", "slow", "medium", "fast", "flat out"];
+
+  // ---------------------------------------------------------------- state
+  let H = 2;                        // hidden units
+  let setName = "xor";
+  let points = [];                  // {x, y, t}
+  let lr = 1.0;
+  let running = false;
+  let epoch = 0;
+  let seed = 1;
+  let lossHist = [];                // subsampled, for the sparkline
+  let lastLoss = null;
+  let solved = false, stuck = false;
+  let byHand = false;               // showing the hand-built weights
+  let attempts = 0, wins = 0;       // the lottery tally
+  let sweepResult = null;           // {2: rate, 3: rate, ...}
+  let plateauRef = null, plateauAt = 0;
+  let acc_ms = 0, last = 0;
+
+  // weights
+  let W1, b1, W2, b2;
+
+  // ---------------------------------------------------------------- rng
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  // Consecutive mulberry32 seeds produce correlated streams, and this playground
+  // walks the seed by +1 on every re-roll. Left unmixed, that correlation biases
+  // the measured solve rate upward by ~8 points (82% instead of 74%) — so the seed
+  // gets an avalanche hash first. This is the murmur3 finalizer.
+  function hash32(n) {
+    let h = n | 0;
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  // Box-Muller: we want a real normal here, not a sum-of-uniforms approximation,
+  // because the whole point is how often a N(0,1) init lands in a bad basin.
+  function normalPair(rnd) {
+    let u = 0, v = 0;
+    while (u === 0) u = rnd();
+    while (v === 0) v = rnd();
+    const r = Math.sqrt(-2 * Math.log(u));
+    return [r * Math.cos(2 * Math.PI * v), r * Math.sin(2 * Math.PI * v)];
+  }
+  function normals(rnd, n) {
+    const out = [];
+    while (out.length < n) { const p = normalPair(rnd); out.push(p[0]); if (out.length < n) out.push(p[1]); }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- datasets
+  function logicSet(targets) {
+    const xs = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    return xs.map((p, i) => ({ x: p[0], y: p[1], t: targets[i] }));
+  }
+  const makeXor = () => logicSet([0, 1, 1, 0]);
+  const makeAnd = () => logicSet([0, 0, 0, 1]);
+
+  function makeRings() {
+    // inner blob = 1, surrounding annulus = 0. No straight line does this, and
+    // unlike XOR it genuinely needs more than two hidden units.
+    const rnd = mulberry32(9), pts = [];
+    for (let i = 0; i < 30; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.10 + rnd() * 0.11;
+      pts.push({ x: 0.5 + r * Math.cos(a), y: 0.5 + r * Math.sin(a), t: 1 });
+    }
+    for (let i = 0; i < 40; i++) {
+      const a = rnd() * Math.PI * 2, r = 0.36 + rnd() * 0.10;
+      pts.push({ x: 0.5 + r * Math.cos(a), y: 0.5 + r * Math.sin(a), t: 0 });
+    }
+    return pts;
+  }
+
+  function makeXorCloud() {
+    // The same four-corner XOR from part 1's playground, as a real point cloud
+    // rather than four exact corners. Same wall, same diagonal — but now you can
+    // watch the surface carve it out of actual scattered data.
+    const targets = [0, 1, 1, 0];
+    const corners = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    const pts = [];
+    corners.forEach((c, i) => {
+      const rnd = mulberry32(100 + i);
+      for (let k = 0; k < 6; k++) {
+        pts.push({ x: c[0] + (rnd() + rnd() + rnd() - 1.5) * 0.12,
+                   y: c[1] + (rnd() + rnd() + rnd() - 1.5) * 0.12, t: targets[i] });
+      }
+    });
+    return pts;
+  }
+
+  const DATASETS = { xor: makeXor, and: makeAnd, rings: makeRings, cloud: makeXorCloud };
+  const isLogic = () => setName === "xor" || setName === "and";
+
+  // ---------------------------------------------------------------- network
+  function initWeights(s) {
+    const rnd = mulberry32(hash32(s));
+    const n = normals(rnd, 2 * H + H);
+    W1 = [];
+    for (let i = 0; i < 2; i++) { W1.push(n.slice(i * H, i * H + H)); }
+    W2 = n.slice(2 * H, 2 * H + H);
+    b1 = new Array(H).fill(0);
+    b2 = 0;
+  }
+
+  // capacity.py's nine numbers are for a hard *threshold* network. Scaled up,
+  // a sigmoid approximates that step closely enough to be exact after rounding.
+  const HAND_GAIN = 10;
+  function loadHandBuilt() {
+    H = 2;
+    syncWidthButtons();
+    W1 = [[HAND_GAIN, HAND_GAIN], [HAND_GAIN, HAND_GAIN]];
+    b1 = [-0.5 * HAND_GAIN, -1.5 * HAND_GAIN];   // unit 1 = OR, unit 2 = AND
+    W2 = [1 * HAND_GAIN, -2 * HAND_GAIN];        // OR minus twice AND
+    b2 = -0.5 * HAND_GAIN;
+  }
+
+  const sig = (z) => 1 / (1 + Math.exp(-z));
+
+  function forward(x1, x2) {
+    const a1 = new Array(H);
+    for (let h = 0; h < H; h++) a1[h] = sig(x1 * W1[0][h] + x2 * W1[1][h] + b1[h]);
+    let z = b2;
+    for (let h = 0; h < H; h++) z += a1[h] * W2[h];
+    return { a1, out: sig(z) };
+  }
+
+  // One full-batch gradient-descent epoch. Mirrors MLP.train_step in
+  // credit_assignment.py line for line, including the /n on the gradients.
+  function trainEpoch() {
+    const n = points.length;
+    const gW1 = [new Array(H).fill(0), new Array(H).fill(0)];
+    const gb1 = new Array(H).fill(0);
+    const gW2 = new Array(H).fill(0);
+    let gb2 = 0, sse = 0;
+
+    for (const p of points) {
+      const { a1, out } = forward(p.x, p.y);
+      const err = out - p.t;
+      sse += err * err;
+      const dOut = err * out * (1 - out);
+      for (let h = 0; h < H; h++) {
+        gW2[h] += a1[h] * dOut / n;
+        // the credit-assignment step: push the output error back through W2
+        const dH = dOut * W2[h] * a1[h] * (1 - a1[h]);
+        gW1[0][h] += p.x * dH / n;
+        gW1[1][h] += p.y * dH / n;
+        gb1[h] += dH / n;
+      }
+      gb2 += dOut / n;
+    }
+
+    for (let h = 0; h < H; h++) {
+      W2[h] -= lr * gW2[h];
+      b1[h] -= lr * gb1[h];
+      W1[0][h] -= lr * gW1[0][h];
+      W1[1][h] -= lr * gW1[1][h];
+    }
+    b2 -= lr * gb2;
+    return sse / n;
+  }
+
+  function allCorrect() {
+    return points.every(p => (forward(p.x, p.y).out > 0.5 ? 1 : 0) === p.t);
+  }
+
+  // "Correct" is not the same as "solved". Very early on, a network can land all
+  // four points on the right side of 0.5 by a whisker while having learned
+  // essentially nothing — outputs like 0.499/0.501, loss still ~0.25. Calling that
+  // a win would both mislead and inflate the solve rate, so a solution has to be
+  // confident as well as correct. The 0.01 bar is the same one the write-up uses
+  // when it reports how long converged runs take.
+  const solveLoss = () => (isLogic() ? 0.002 : 0.05);
+  function solvedAt(loss) {
+    return loss !== null && loss < solveLoss() && allCorrect();
+  }
+  function numCorrect() {
+    return points.reduce((k, p) => k + ((forward(p.x, p.y).out > 0.5 ? 1 : 0) === p.t ? 1 : 0), 0);
+  }
+
+  // ---------------------------------------------------------------- stepping
+  function stepEpoch() {
+    if (solved || stuck) return;
+    lastLoss = trainEpoch();
+    epoch++;
+
+    if (epoch % 40 === 0 || lossHist.length === 0) lossHist.push(lastLoss);
+
+    if (solvedAt(lastLoss)) {
+      solved = true; running = false;
+      finish(`<b>Solved</b> in ${epoch.toLocaleString()} epochs. The boundary bent into place.`, "solved");
+      recordAttempt(true);
+      return;
+    }
+    // Plateau check: a stuck run flatlines. The test is *relative* — an absolute
+    // epsilon that reads as "stopped" on the four-point problem is larger than the
+    // real per-epoch progress on a bigger point cloud, which would label a slow but
+    // genuinely-descending run a failure.
+    if (plateauRef === null || lastLoss < plateauRef * (1 - 1e-5)) {
+      plateauRef = lastLoss; plateauAt = epoch;
+    }
+    if (epoch > 3000 && epoch - plateauAt > 1500) {
+      stuck = true; running = false;
+      finish(stuckMessage(), "stuck");
+      recordAttempt(false);
+      return;
+    }
+    if (epoch >= MAX_EPOCHS) {
+      stuck = true; running = false;
+      finish(`${stuckMessage()} (Full ${MAX_EPOCHS.toLocaleString()} epochs, same budget as the write-up.)`, "stuck");
+      recordAttempt(false);
+    }
+  }
+
+  // The failures have recognisable shapes, and naming the one on screen is far more
+  // instructive than a generic "did not converge". Both of these show up in the
+  // Python sweep too (src/inspect_stuck.py prints them).
+  function stuckMessage() {
+    if (!isLogic()) {
+      return `<b>Stuck.</b> Loss stopped improving with ${numCorrect()} of ${points.length} points right.`;
+    }
+    const outs = points.map(p => forward(p.x, p.y).out);
+    const hedged = outs.filter(o => Math.abs(o - 0.5) < 0.05).length;
+    if (hedged > 0) {
+      return `<b>Stuck.</b> It learned ${points.length - hedged} points and is hedging at exactly 0.5 ` +
+             `on the other ${hedged} &mdash; improving either one first requires getting worse. ` +
+             `That hedge is what loss 0.125 costs.`;
+    }
+    // The other mode: learn one point, then emit a single constant — the mean of the
+    // targets it hasn't separated — for all the rest. Keyed on *uncommitted* outputs
+    // rather than misclassified ones, because a constant near 0.67 still lands on the
+    // right side of 0.5 for two of the three points it has given up on.
+    const vague = outs.filter(o => o > 0.1 && o < 0.9);
+    if (vague.length >= 2) {
+      const spread = Math.max(...vague) - Math.min(...vague);
+      if (spread < 0.05) {
+        return `<b>Stuck.</b> It collapsed to one constant (~${vague[0].toFixed(2)}) across the ` +
+               `${vague.length} points it never separated &mdash; the average of their targets, ` +
+               `which is the best a single number can do.`;
+      }
+    }
+    return `<b>Stuck.</b> Gradient descent stopped improving before it solved this.`;
+  }
+
+  function finish(msg, cls) {
+    document.getElementById("statusText").innerHTML = msg;
+    document.getElementById("status").className = "status " + cls;
+    document.getElementById("run").textContent = "Run";
+  }
+
+  function recordAttempt(won) {
+    if (byHand) return;             // the hand-built solution isn't a draw
+    attempts++; if (won) wins++;
+    renderTally();
+  }
+
+  function renderTally() {
+    const rate = document.getElementById("tallyRate");
+    const text = document.getElementById("tallyText");
+    if (attempts === 0) { rate.textContent = "—"; text.textContent = "no attempts yet"; return; }
+    rate.textContent = Math.round(wins / attempts * 100) + "%";
+    text.textContent = `${wins} solved of ${attempts} random init${attempts === 1 ? "" : "s"}` +
+                       ` · ${H} hidden`;
+  }
+
+  // ---------------------------------------------------------------- reset
+  function resetRun(newSeed) {
+    running = false;
+    epoch = 0; lastLoss = null; lossHist = [];
+    solved = false; stuck = false; byHand = false;
+    plateauRef = null; plateauAt = 0;
+    acc_ms = 0; last = 0;
+    if (newSeed !== undefined) seed = newSeed;
+    initWeights(seed);
+    document.getElementById("run").textContent = "Run";
+    document.getElementById("status").className = "status";
+    document.getElementById("statusText").textContent =
+      "Ready. Press Run to train from a random start.";
+    document.getElementById("byHand").classList.remove("accent-btn");
+    buildDiagram();
+    updateReadout();
+  }
+
+  function loadSet(name) {
+    setName = name;
+    points = DATASETS[name]();
+    attempts = 0; wins = 0;
+    sweepResult = null;
+    document.querySelectorAll("#presets button").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.set === name)));
+
+    // The truth table only makes sense for the four-point logic problems; the
+    // continuous sets get an accuracy count instead.
+    document.getElementById("ioWrap").classList.toggle("hide", !isLogic());
+    document.getElementById("accWrap").classList.toggle("hide", isLogic());
+    document.getElementById("byHand").classList.toggle("hide", name !== "xor");
+    document.getElementById("sweepBtn").disabled = !isLogic();
+    document.getElementById("sweepHint").textContent = isLogic()
+      ? "Runs entirely in this tab. Reproduces the shape of the measurement in the write-up."
+      : "Only available on the four-point logic problems — the continuous sets are too slow to sweep in a browser.";
+    document.getElementById("widthHint").innerHTML = name === "xor"
+      ? "2 units already represent XOR exactly. Anything more adds <b>no</b> representational power — only more routes downhill."
+      : name === "and"
+      ? "AND needs no hidden layer at all — one line separates it. A useful baseline."
+      : name === "cloud"
+      ? "The four-corner XOR from part 1, as scattered data. Two units still suffice — finding them is still the hard part."
+      : "Here width buys <b>real</b> capacity, not just reliability: two units cannot bend enough for this shape.";
+    renderTally();
+    renderSweep();
+    resetRun();
+  }
+
+  // ---------------------------------------------------------------- drawing
+  const toPx = (x) => (x - D0) / SPAN * S.css;
+  const toPy = (y) => (D1 - y) / SPAN * S.css;
+
+  function hexToRgb(h) {
+    h = h.trim();
+    if (h[0] === "#") h = h.slice(1);
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+
+  function drawSurface(col) {
+    const c1 = hexToRgb(col("--c1")), c0 = hexToRgb(col("--c0"));
+    const d = surfImg.data;
+    for (let j = 0; j < SURF; j++) {
+      const y = D1 - (j + 0.5) / SURF * SPAN;
+      for (let i = 0; i < SURF; i++) {
+        const x = D0 + (i + 0.5) / SURF * SPAN;
+        const o = forward(x, y).out;
+        const k = (j * SURF + i) * 4;
+        const c = o > 0.5 ? c1 : c0;
+        d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2];
+        // Confidence drives opacity, so the boundary reads as a soft band and a
+        // freshly-initialised network looks genuinely undecided.
+        d[k + 3] = Math.round(Math.min(Math.abs(o - 0.5) * 2, 1) * 70);
+      }
+    }
+    surfCtx.putImageData(surfImg, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(surf, 0, 0, S.css, S.css);
+  }
+
+  function drawGrid(col) {
+    const s = S.css;
+    ctx.strokeStyle = col("--grid"); ctx.lineWidth = 1;
+    for (let v = 0; v <= 1.0001; v += 0.5) {
+      ctx.beginPath(); ctx.moveTo(toPx(v), 0); ctx.lineTo(toPx(v), s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, toPy(v)); ctx.lineTo(s, toPy(v)); ctx.stroke();
+    }
+  }
+
+  // A hidden unit's line: w1*x + w2*y + b = 0, clipped to the view box.
+  function unitLine(w1, w2, b) {
+    const pts = [];
+    const push = (x, y) => { if (x >= D0 - 1e-9 && x <= D1 + 1e-9 && y >= D0 - 1e-9 && y <= D1 + 1e-9) pts.push([x, y]); };
+    if (Math.abs(w2) > 1e-9) { push(D0, -(w1 * D0 + b) / w2); push(D1, -(w1 * D1 + b) / w2); }
+    if (Math.abs(w1) > 1e-9) { push(-(w2 * D0 + b) / w1, D0); push(-(w2 * D1 + b) / w1, D1); }
+    return pts.length >= 2 ? [pts[0], pts[1]] : null;
+  }
+
+  function drawUnitLines(col) {
+    ctx.strokeStyle = col("--muted"); ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 4]); ctx.globalAlpha = 0.75;
+    for (let h = 0; h < H; h++) {
+      const seg = unitLine(W1[0][h], W1[1][h], b1[h]);
+      if (!seg) continue;
+      ctx.beginPath();
+      ctx.moveTo(toPx(seg[0][0]), toPy(seg[0][1]));
+      ctx.lineTo(toPx(seg[1][0]), toPy(seg[1][1]));
+      ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+
+  function drawPoints(col) {
+    const big = isLogic();
+    for (const p of points) {
+      const out = forward(p.x, p.y).out;
+      const right = (out > 0.5 ? 1 : 0) === p.t;
+      const px = toPx(p.x), py = toPy(p.y);
+      const r = big ? 9 : 4.2;
+
+      if (big) {
+        // Confidence ring: how sure the network is about this point right now.
+        ctx.beginPath(); ctx.arc(px, py, r + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = col("--hair"); ctx.lineWidth = 3; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(px, py, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.abs(out - 0.5) * 2);
+        ctx.strokeStyle = col(p.t ? "--c1" : "--c0"); ctx.lineWidth = 3; ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = col(p.t ? "--c1" : "--c0"); ctx.fill();
+      if (!right) {
+        ctx.beginPath(); ctx.arc(px, py, r + 2.5, 0, Math.PI * 2);
+        ctx.strokeStyle = col("--bad"); ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+  }
+
+  function drawSparkline(col) {
+    const w = SP.css, h = SP.cssH;
+    sctx.clearRect(0, 0, w, h);
+    sctx.strokeStyle = col("--hair"); sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.moveTo(0, h - 1); sctx.lineTo(w, h - 1); sctx.stroke();
+    if (lossHist.length < 2) return;
+
+    // Log scale, same bounds as the figure in the write-up: a converged run falls
+    // several decades while a stuck one sits flat, and a linear axis hides that.
+    const LO = 8e-5, HI = 0.6;
+    const yAt = (v) => {
+      const t = (Math.log10(Math.max(v, LO)) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO));
+      return h - 3 - Math.max(0, Math.min(1, t)) * (h - 6);
+    };
+    const xAt = (i) => i / (lossHist.length - 1) * w;
+
+    // Mark the 0.125 hedge plateau so a stuck run visibly lands on a line.
+    if (isLogic()) {
+      sctx.strokeStyle = col("--bad"); sctx.globalAlpha = .35;
+      sctx.setLineDash([3, 3]); sctx.beginPath();
+      sctx.moveTo(0, yAt(0.125)); sctx.lineTo(w, yAt(0.125)); sctx.stroke();
+      sctx.setLineDash([]); sctx.globalAlpha = 1;
+    }
+    sctx.strokeStyle = col("--accent"); sctx.lineWidth = 1.6;
+    sctx.beginPath();
+    lossHist.forEach((v, i) => i ? sctx.lineTo(xAt(i), yAt(v)) : sctx.moveTo(xAt(i), yAt(v)));
+    sctx.stroke();
+    const lastI = lossHist.length - 1;
+    sctx.beginPath(); sctx.arc(xAt(lastI), yAt(lossHist[lastI]), 2.6, 0, Math.PI * 2);
+    sctx.fillStyle = col("--accent"); sctx.fill();
+  }
+
+  function draw() {
+    const s = S.css;
+    ctx.clearRect(0, 0, s, s);
+    const css = getComputedStyle(document.documentElement);
+    const col = (n) => css.getPropertyValue(n).trim();
+    drawSurface(col);
+    drawGrid(col);
+    drawUnitLines(col);
+    drawPoints(col);
+    drawSparkline(col);
+  }
+
+  // ---------------------------------------------------------------- diagram
+  const fmt = (n) => (n >= 0 ? "+" : "") + n.toFixed(2);
+
+  // Vertical layout for the hidden column. The spread is capped so two units sit
+  // sensibly close together instead of being flung to the top and bottom edges,
+  // and the whole block stays clear of the captions above and the note below.
+  const NET_MID = 115, NET_RANGE = 142, NET_MAX_GAP = 58;
+  function nodeY(i, n) {
+    if (n === 1) return NET_MID;
+    const gap = Math.min(NET_MAX_GAP, NET_RANGE / (n - 1));
+    return NET_MID - gap * (n - 1) / 2 + i * gap;
+  }
+
+  function buildDiagram() {
+    const parts = [];
+    const IX = 68, HX = 310, OX = 552;
+    const iy = [NET_MID - 29, NET_MID + 29];
+
+    // edges first so nodes paint over them
+    for (let h = 0; h < H; h++) {
+      for (let i = 0; i < 2; i++) {
+        parts.push(`<line class="nd-edge e1" data-i="${i}" data-h="${h}" x1="${IX}" y1="${iy[i]}" x2="${HX}" y2="${nodeY(h, H)}" />`);
+      }
+    }
+    for (let h = 0; h < H; h++) {
+      parts.push(`<line class="nd-edge e2" data-h="${h}" x1="${HX}" y1="${nodeY(h, H)}" x2="${OX}" y2="${NET_MID}" />`);
+    }
+
+    parts.push(`<circle class="nd-node nd-in" cx="${IX}" cy="${iy[0]}" r="19" />`);
+    parts.push(`<text class="nd-lbl" x="${IX}" y="${iy[0] + 5}" text-anchor="middle" font-size="14">x&#8321;</text>`);
+    parts.push(`<circle class="nd-node nd-in" cx="${IX}" cy="${iy[1]}" r="19" />`);
+    parts.push(`<text class="nd-lbl" x="${IX}" y="${iy[1] + 5}" text-anchor="middle" font-size="14">x&#8322;</text>`);
+
+    const hr = H > 4 ? 12 : 17;
+    for (let h = 0; h < H; h++) {
+      parts.push(`<circle class="nd-node nd-hid" id="hid${h}" cx="${HX}" cy="${nodeY(h, H)}" r="${hr}" />`);
+      if (H <= 4) parts.push(`<text class="nd-num" id="hact${h}" x="${HX}" y="${nodeY(h, H) + 4}" text-anchor="middle">—</text>`);
+    }
+    parts.push(`<circle class="nd-node nd-out" id="outNode" cx="${OX}" cy="${NET_MID}" r="19" />`);
+    parts.push(`<text class="nd-num" id="outVal" x="${OX}" y="${NET_MID + 4}" text-anchor="middle">—</text>`);
+
+    parts.push(`<text class="nd-cap" x="${IX}" y="16" text-anchor="middle">input</text>`);
+    parts.push(`<text class="nd-cap" x="${HX}" y="16" text-anchor="middle">hidden &times;${H}</text>`);
+    parts.push(`<text class="nd-cap" x="${OX}" y="16" text-anchor="middle">output</text>`);
+    parts.push(`<text class="nd-cap" id="netNote" x="310" y="230" text-anchor="middle"></text>`);
+
+    net.innerHTML = parts.join("");
+    updateDiagram();
+  }
+
+  function updateDiagram() {
+    const css = getComputedStyle(document.documentElement);
+    const col = (n) => css.getPropertyValue(n).trim();
+    const wOf = (w) => 0.8 + Math.min(Math.abs(w), 6) / 6 * 3.4;
+    const cOf = (w) => w >= 0 ? col("--c1") : col("--c0");
+
+    net.querySelectorAll("line.e1").forEach(el => {
+      const w = W1[+el.dataset.i][+el.dataset.h];
+      el.setAttribute("stroke", cOf(w));
+      el.setAttribute("stroke-width", wOf(w).toFixed(2));
+      el.setAttribute("stroke-opacity", ".55");
+    });
+    net.querySelectorAll("line.e2").forEach(el => {
+      const w = W2[+el.dataset.h];
+      el.setAttribute("stroke", cOf(w));
+      el.setAttribute("stroke-width", wOf(w).toFixed(2));
+      el.setAttribute("stroke-opacity", ".55");
+    });
+
+    // Show the activations for whichever point is most wrong — that's the one
+    // carrying the most gradient, so it's the informative one to watch.
+    let worst = null, worstErr = -1;
+    for (const p of points) {
+      const o = forward(p.x, p.y).out, e = Math.abs(o - p.t);
+      if (e > worstErr) { worstErr = e; worst = p; }
+    }
+    const note = net.querySelector("#netNote");
+    if (!worst || lastLoss === null) {
+      for (let h = 0; h < H; h++) { const t = net.querySelector(`#hact${h}`); if (t) t.textContent = "—"; }
+      const ov = net.querySelector("#outVal"); if (ov) ov.textContent = "—";
+      if (note) note.textContent = "edge thickness = weight size · colour = sign";
+      return;
+    }
+    const { a1, out } = forward(worst.x, worst.y);
+    for (let h = 0; h < H; h++) {
+      const t = net.querySelector(`#hact${h}`);
+      if (t) t.textContent = a1[h].toFixed(2).replace(/^0/, "");
+    }
+    const ov = net.querySelector("#outVal");
+    if (ov) {
+      ov.textContent = out.toFixed(2).replace(/^0/, "");
+      ov.setAttribute("fill", Math.abs(out - 0.5) < 0.05 ? col("--bad") : col("--ink"));
+    }
+    if (note) {
+      note.textContent = `showing the worst-fit point (${worst.x}, ${worst.y}) — wants ${worst.t}, gets ${out.toFixed(2)}`;
+    }
+  }
+
+  // Staged backward pulse: output, then the W2 edges, then the hidden units.
+  // Only fires on a single Step — during a run it would be strobing noise.
+  function pulseBackward() {
+    const restart = (el, cls) => { el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); };
+    const o = net.querySelector("#outNode");
+    if (o) restart(o, "nd-pulse");
+    setTimeout(() => net.querySelectorAll("line.e2").forEach(el => restart(el, "edge-pulse")), 130);
+    setTimeout(() => net.querySelectorAll("circle.nd-hid").forEach(el => restart(el, "nd-pulse")), 260);
+    setTimeout(() => net.querySelectorAll("line.e1").forEach(el => restart(el, "edge-pulse")), 390);
+  }
+
+  // ---------------------------------------------------------------- readout
+  function updateReadout() {
+    document.getElementById("v-epoch").textContent = epoch.toLocaleString();
+    document.getElementById("v-loss").textContent =
+      lastLoss === null ? "—" : (lastLoss < 0.001 ? lastLoss.toExponential(1) : lastLoss.toFixed(4));
+    document.getElementById("v-state").textContent =
+      solved ? "yes" : (stuck ? "no" : (lastLoss === null ? "—" : "…"));
+    document.getElementById("gaugeCard").className =
+      "card" + (solved ? " solved" : "") + (stuck ? " stuck" : "");
+
+    if (isLogic()) {
+      const rows = points.map(p => {
+        const out = forward(p.x, p.y).out;
+        const right = (out > 0.5 ? 1 : 0) === p.t;
+        const hedge = Math.abs(out - 0.5) < 0.05 && lastLoss !== null;
+        const cls = lastLoss === null ? "" : (hedge ? "hedge" : (right ? "ok" : "bad"));
+        return `<div class="io-row ${cls}"><span>${p.x}</span><span>${p.y}</span>` +
+               `<span class="t">${p.t}</span>` +
+               `<span class="o">${lastLoss === null ? "—" : out.toFixed(3)}</span></div>`;
+      });
+      document.getElementById("ioRows").innerHTML = rows.join("");
+    } else {
+      const k = numCorrect();
+      document.getElementById("v-acc").textContent = lastLoss === null ? "—" : `${k}/${points.length}`;
+      document.getElementById("v-accText").textContent =
+        lastLoss === null ? "" : `${Math.round(k / points.length * 100)}% · ${H} hidden units`;
+    }
+    updateDiagram();
+  }
+
+  // ---------------------------------------------------------------- sweep
+  function renderSweep() {
+    const host = document.getElementById("sweepRows");
+    const widths = [2, 3, 4, 8];
+    host.innerHTML = widths.map(w => {
+      const r = sweepResult ? sweepResult[w] : null;
+      const pct = r === null ? "—" : Math.round(r * 100) + "%";
+      const fill = r === null ? 0 : r * 100;
+      return `<div class="sweep-row ${w === H ? "cur" : ""}"><span class="n">${w}</span>` +
+             `<span class="bar"><i style="width:${fill}%"></i></span>` +
+             `<span class="r">${pct}</span></div>`;
+    }).join("");
+  }
+
+  // Runs headless — no rendering, no rAF — so 400 full trainings finish in well
+  // under a second on a 9-parameter network.
+  function runSweep() {
+    const btn = document.getElementById("sweepBtn");
+    btn.disabled = true; btn.textContent = "Running…";
+    const savedH = H, savedPts = points;
+
+    setTimeout(() => {
+      const widths = [2, 3, 4, 8], N = 100, res = {};
+      for (const w of widths) {
+        let ok = 0;
+        for (let s = 0; s < N; s++) {
+          H = w; initWeights(1000 + s);
+          let ref = null, refAt = 0, l = 0;
+          for (let e = 1; e <= MAX_EPOCHS; e++) {
+            l = trainEpoch();
+            if (ref === null || l < ref - 1e-7) { ref = l; refAt = e; }
+            if (e > 3000 && e - refAt > 1500) break;
+            if (l < solveLoss()) break;      // same bar as a single run
+          }
+          if (solvedAt(l)) ok++;
+        }
+        res[w] = ok / N;
+      }
+      sweepResult = res;
+      H = savedH; points = savedPts;
+      initWeights(seed);
+      renderSweep();
+      btn.disabled = false; btn.textContent = "Run again";
+      resetRun();
+    }, 30);
+  }
+
+  // ---------------------------------------------------------------- loop
+  function frame(t) {
+    if (running) {
+      if (!last) last = t;
+      acc_ms += t - last; last = t;
+      // Advance a fixed number of epochs per frame rather than per millisecond;
+      // training speed should not depend on the monitor's refresh rate.
+      if (acc_ms >= 16) {
+        const n = epochsPerFrame[+document.getElementById("speed").value];
+        for (let i = 0; i < n && running; i++) stepEpoch();
+        acc_ms = 0;
+        updateReadout();
+      }
+    } else { last = 0; acc_ms = 0; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- sizing
+  function resize() {
+    const rect = cv.parentElement.getBoundingClientRect();
+    S.css = rect.width;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(rect.width * dpr);
+    cv.height = Math.round(rect.width * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const sr = spark.getBoundingClientRect();
+    SP.css = sr.width || spark.parentElement.getBoundingClientRect().width;
+    spark.width = Math.round(SP.css * dpr);
+    spark.height = Math.round(SP.cssH * dpr);
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  new ResizeObserver(resize).observe(cv.parentElement);
+  new ResizeObserver(resize).observe(spark.parentElement);
+
+  // ---------------------------------------------------------------- wiring
+  function syncWidthButtons() {
+    document.querySelectorAll("#widthToggle button").forEach(b =>
+      b.setAttribute("aria-pressed", String(+b.dataset.h === H)));
+  }
+
+  document.getElementById("run").addEventListener("click", (e) => {
+    if (solved || stuck) resetRun(seed + 1);
+    running = !running;
+    e.currentTarget.textContent = running ? "Pause" : "Run";
+    last = 0; acc_ms = 0;
+  });
+  document.getElementById("step").addEventListener("click", () => {
+    running = false;
+    document.getElementById("run").textContent = "Run";
+    stepEpoch(); updateReadout(); pulseBackward();
+  });
+  document.getElementById("reset").addEventListener("click", () => resetRun());
+
+  document.getElementById("presets").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (b) loadSet(b.dataset.set);
+  });
+  document.getElementById("widthToggle").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    H = +b.dataset.h; syncWidthButtons();
+    attempts = 0; wins = 0;
+    renderTally(); renderSweep(); resetRun();
+  });
+
+  document.getElementById("reroll").addEventListener("click", () => {
+    resetRun(seed + 1);
+    running = true;
+    document.getElementById("run").textContent = "Pause";
+  });
+
+  document.getElementById("byHand").addEventListener("click", () => {
+    resetRun();
+    loadHandBuilt();
+    byHand = true;
+    lastLoss = points.reduce((s, p) => s + Math.pow(forward(p.x, p.y).out - p.t, 2), 0) / points.length;
+    lossHist = [lastLoss];
+    solved = solvedAt(lastLoss);
+    document.getElementById("byHand").classList.add("accent-btn");
+    finish(solved
+      ? "<b>Exact XOR, zero training.</b> Nine numbers, written down by hand — capacity was never the problem."
+      : "Loaded the hand-built weights.", solved ? "solved" : "");
+    buildDiagram(); updateReadout();
+  });
+
+  document.getElementById("sweepBtn").addEventListener("click", runSweep);
+
+  document.getElementById("speed").addEventListener("input", (e) => {
+    document.getElementById("speedVal").textContent = SPEED_NAME[+e.target.value];
+  });
+  document.getElementById("lr").addEventListener("input", (e) => {
+    lr = +e.target.value / 100;
+    document.getElementById("lrVal").textContent = lr.toFixed(2);
+  });
+
+  const root = document.documentElement;
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme")
+      || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    updateDiagram();
+  });
+
+  // ---------------------------------------------------------------- boot
+  loadSet("xor");
+  resize();
+  requestAnimationFrame(frame);
+
+  // test hook
+  window.__pg = {
+    state: () => ({ H, setName, epoch, lastLoss, solved, stuck, byHand, attempts, wins,
+                    lossHist, sweepResult, points, seed,
+                    outs: points.map(p => forward(p.x, p.y).out) }),
+    setSeed: (s) => resetRun(s),
+    setWidth: (h) => { H = h; syncWidthButtons(); resetRun(); },
+    trainTo: (maxEpochs) => { for (let i = 0; i < maxEpochs && !solved && !stuck; i++) stepEpoch(); updateReadout(); },
+    loadSet, forward, allCorrect, numCorrect, runSweep,
+  };
+})();
+</script>
+</body>
+</html>

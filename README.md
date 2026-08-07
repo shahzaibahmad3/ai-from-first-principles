@@ -11,6 +11,7 @@ code behind it, no libraries, no magic.
 | # | Post | Code |
 |---|------|------|
 | 1 | [The Neuron — the unit an LLM is built from](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/) | [`neuron/`](neuron/) |
+| 2 | [XOR Was Never the Hard Part. Finding the Weights Was.](https://shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/) | [`finding-the-weights/`](finding-the-weights/) |
 
 More parts land here as the series continues.
 
@@ -19,7 +20,9 @@ More parts land here as the series continues.
 Each post folder is self-contained:
 
 ```bash
-cd neuron
-open index.html          # the playground, no install needed
-python3 src/neuron.py    # the reference implementation
+cd finding-the-weights
+open index.html                    # the playground, no install needed
+pip install -r requirements.txt
+python3 src/capacity.py            # hand-built XOR, no training
+python3 src/credit_assignment.py   # the 1,200-run experiment
 ```

@@ -166,6 +166,6 @@ But it all starts with one line, moving until it's right.
 
 ---
 
-**Next → Why one line wasn't enough: the XOR wall, and the fix everything since is built on.**
+**Next → [XOR Was Never the Hard Part. Finding the Weights Was.](https://shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/)** — the hidden layer that bends the boundary, and the 1,200 training runs showing that finding the weights, not representing the answer, was the real wall.
 
 *This is Part 1 of "AI, from first principles" — I use AI heavily, every day, for real work. This series is me making the machinery underneath it concrete, one genuinely-understood idea at a time.*
