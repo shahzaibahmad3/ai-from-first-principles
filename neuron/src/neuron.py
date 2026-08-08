@@ -2,9 +2,10 @@
 A single neuron, written to be read.
 
 This is the exact unit an LLM is built from -- in its simplest, classic form
-(the "perceptron"): a weighted sum, then a yes/no. About 30 lines of plain
-Python, no libraries. It's the same algorithm the interactive playground runs.
-If you understand this file, you understand the atom the whole field is made of.
+(the "perceptron"): a weighted sum, then a yes/no. The two functions below are
+23 lines of logic between them, no libraries. It's the same algorithm the
+interactive playground runs. If you understand this file, you understand the
+atom the whole field is made of.
 
 Run it:
     python3 neuron.py
@@ -63,26 +64,35 @@ def train(points, labels, lr=0.1, epochs=100):
     return weights, bias
 
 
-if __name__ == "__main__":
-    # AND gate: fire only when BOTH inputs are on. (-1 = off, +1 = on)
-    # This is linearly separable, so the perceptron will find a line.
-    points = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-    labels = [0, 0, 0, 1]
-
-    weights, bias = train(points, labels, lr=0.1)
+def report(name, points, labels, lr=0.1, epochs=100):
+    """Train on one gate and print what the neuron ended up believing."""
+    print(f"=== {name} ===")
+    weights, bias = train(points, labels, lr=lr, epochs=epochs)
 
     print(f"\nlearned:  w1={weights[0]:+.2f}  w2={weights[1]:+.2f}  b={bias:+.2f}")
     print(f"line:     {weights[0]:+.2f}*x1 {weights[1]:+.2f}*x2 {bias:+.2f} = 0\n")
 
     print("  x1  x2 | want  got")
     print("  ---------|---------")
+    wrong = 0
     for point, target in zip(points, labels):
         got = predict(weights, bias, point)
-        mark = " " if got == target else "  <- wrong"
+        if got != target:
+            wrong += 1
+        mark = "" if got == target else "  <- wrong"
         print(f"  {point[0]:+d}  {point[1]:+d} |   {target}    {got}{mark}")
+    print(f"\n  {wrong} of {len(points)} wrong\n")
 
-    # Now try XOR -- fire when the inputs DIFFER. No straight line can do this,
-    # so training will run all 100 passes and still miss. Swap the labels in
-    # and watch it fail. That failure is the whole point of the next post.
-    #
-    # labels = [0, 1, 1, 0]   # <- uncomment to watch it never converge
+
+if __name__ == "__main__":
+    # (-1 = off, +1 = on)
+    points = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+    # AND: fire only when BOTH inputs are on. Linearly separable, so the
+    # perceptron is guaranteed to find a line -- and it does, quickly.
+    report("AND gate (separable)", points, [0, 0, 0, 1])
+
+    # XOR: fire when the inputs DIFFER. No straight line can do this, so
+    # training burns all 100 passes and still gets one point wrong, forever.
+    # That failure is the whole subject of the next post.
+    report("XOR gate (impossible for one neuron)", points, [0, 1, 1, 0])

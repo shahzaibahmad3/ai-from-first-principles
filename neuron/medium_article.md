@@ -98,7 +98,7 @@ This isn't the algorithm being slow. It's a hard geometric wall: **one neuron dr
 
 The fix is almost silly in hindsight: use more than one neuron.
 
-Wire a *layer* of neurons together and their outputs can be combined into a boundary that **bends**. Stack more layers and it can bend into nearly any shape at all — this is the [universal approximation](https://en.wikipedia.org/wiki/Universal_approximation_theorem) property. Do that with **millions** of neurons, tuned by **hundreds of billions** of adjustable numbers (GPT-3, for scale, has ~175 billion of them across ~5 million neurons), train it on a huge slice of the internet, and the thing that began as "should I take an umbrella" becomes something that writes working code and answers almost anything.
+Wire a *layer* of neurons together and their outputs can be combined into a boundary that **bends**. And it doesn't take much: the [universal approximation theorem](https://en.wikipedia.org/wiki/Universal_approximation_theorem) says that *one* hidden layer, given enough neurons in it, can already approximate essentially any continuous function you like (Cybenko and Hornik, both 1989). Depth isn't what buys you the expressiveness — it's what makes it affordable, letting you get the same shapes with far fewer units than one enormous layer would need. Do that with **millions** of neurons, tuned by **hundreds of billions** of adjustable numbers (GPT-3, for scale, has ~175 billion of them across ~5 million neurons), train it on a huge slice of the internet, and the thing that began as "should I take an umbrella" becomes something that writes working code and answers almost anything.
 
 That's the engine inside a large language model: the same tiny decision-maker, copied and stacked until the shapes it can draw get unimaginably complex.
 
@@ -112,9 +112,9 @@ But the unit doing the work in every layer is exactly the one you just played wi
 
 ---
 
-## The code — all 30 lines of it
+## The code — 23 lines of it
 
-The playground and this whole post run on [`neuron.py`](https://github.com/shahzaibahmad3/ai-from-first-principles/blob/main/neuron/src/neuron.py), which uses no libraries at all. The forward pass:
+The playground and this whole post run on [`neuron.py`](https://github.com/shahzaibahmad3/ai-from-first-principles/blob/main/neuron/src/neuron.py), which uses no libraries at all. Two functions, 23 lines of logic between them. The forward pass:
 
 ```python
 def predict(weights, bias, point):
@@ -135,7 +135,7 @@ if error != 0:
     bias += lr * error
 ```
 
-Run it and you'll see AND solved in two passes and XOR give up after a hundred:
+Run it and you'll see AND separate after two passes, then XOR burn all one hundred and still get a point wrong:
 
 ```bash
 git clone https://github.com/shahzaibahmad3/ai-from-first-principles
@@ -144,6 +144,21 @@ python3 src/neuron.py
 ```
 
 If you can read those two snippets, you understand the unit an LLM is built from — the real thing, not a simplified cartoon of it.
+
+---
+
+## Run everything yourself
+
+```bash
+git clone https://github.com/shahzaibahmad3/ai-from-first-principles
+cd ai-from-first-principles/neuron
+
+open index.html          # the interactive playground, no dependencies
+python3 src/neuron.py    # the reference implementation, pure Python
+
+pip install -r requirements.txt
+python3 src/figure.py    # regenerates the figure at the top of this page
+```
 
 ---
 
@@ -159,7 +174,7 @@ But it all starts with one line, moving until it's right.
 ## Sources & further reading
 
 - Rosenblatt, F. (1958). *The Perceptron: A Probabilistic Model for Information Storage and Organization in the Brain* — [Psychological Review](https://psycnet.apa.org/record/1959-09865-001)
-- Novikoff, A.B.J. (1962). *On Convergence Proofs on Perceptrons* — [Proceedings of the Symposium on Mathematical Theory of Automata](https://apps.dtic.mil/sti/tr/pdf/AD0298258.pdf)
+- Novikoff, A.B.J. (1962). *On Convergence Proofs on Perceptrons*, Proceedings of the Symposium on Mathematical Theory of Automata — the proof is reproduced in [Wikipedia's perceptron article](https://en.wikipedia.org/wiki/Perceptron#Convergence_of_one_perceptron_on_a_linearly_separable_dataset)
 - [Universal approximation theorem — overview](https://en.wikipedia.org/wiki/Universal_approximation_theorem)
 - [How GPT-3 spends its 175B parameters](https://www.lesswrong.com/posts/3duR8CrvcHywrnhLo/how-does-gpt-3-spend-its-175b-parameters) (where the neuron / parameter counts come from)
 - [3Blue1Brown — Neural Networks (visual intuition)](https://www.3blue1brown.com/topics/neural-networks)
