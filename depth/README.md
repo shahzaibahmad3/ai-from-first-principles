@@ -7,6 +7,11 @@
 > **There's a playground for this.** Open [`index.html`](index.html) in any browser (just
 > double-click it — no install, no server). Every bar is one layer's gradient on a log scale. Press
 > **Run** with the defaults and watch the bottom of the stack sit still. Then turn **ReLU** on.
+>
+> It runs a smaller version of the same experiment — 140 points instead of 240, and its own random
+> number generator rather than NumPy's — because it has to do a forward and backward pass every frame.
+> So its exact numbers won't match the tables below. The orders of magnitude and the orderings do,
+> because those are properties of the arithmetic rather than of the sample.
 
 ---
 

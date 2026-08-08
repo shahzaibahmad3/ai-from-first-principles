@@ -4,9 +4,13 @@
 
 ![Gradient norm by layer at depth 40, and accuracy by depth, for four configurations](https://raw.githubusercontent.com/shahzaibahmad3/ai-from-first-principles/main/depth/image.png)
 
-> **There's a playground for this.** Open [shahzaibahmad3.github.io/ai-from-first-principles/depth/](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/) in any browser (just
-> double-click it — no install, no server). Every bar is one layer's gradient on a log scale. Press
+> **There's a playground for this.** Open [shahzaibahmad3.github.io/ai-from-first-principles/depth/](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/) (nothing to install). Every bar is one layer's gradient on a log scale. Press
 > **Run** with the defaults and watch the bottom of the stack sit still. Then turn **ReLU** on.
+>
+> It runs a smaller version of the same experiment — 140 points instead of 240, and its own random
+> number generator rather than NumPy's — because it has to do a forward and backward pass every frame.
+> So its exact numbers won't match the tables below. The orders of magnitude and the orderings do,
+> because those are properties of the arithmetic rather than of the sample.
 
 ---
 

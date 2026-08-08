@@ -3,14 +3,17 @@ Hero figure for the post: the one idea, and its one limit, side by side.
 
 Left  — separable data: the perceptron finds a line, and everything is on the
         right side of it.
-Right — XOR: the same algorithm, the best line it can manage, and two points it
-        is still forced to get wrong. No straight line exists that fixes them.
+Right — XOR: the same algorithm, the best line it can manage, and the whole
+        corner of ten points it is still forced to get wrong. No straight line
+        exists that fixes them.
 
 Both panels plot the ACTUAL decision boundary the algorithm converges (or fails
 to converge) to. Palette matches the interactive playground.
 
-    python3 figure.py   ->  writes ../image.png
+    python3 src/figure.py   ->  writes image.png beside the post
 """
+
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -140,5 +143,9 @@ fig.text(.02, .015, "each panel plots the real boundary the algorithm converges 
                     "src/figure.py  ·  amber = fires (1), blue = quiet (0), red ring = misclassified",
          color=MUTED, fontsize=8.5, family="monospace")
 fig.tight_layout(rect=[0, .03, 1, .93])
-fig.savefig("../image.png", dpi=155)
-print(f"wrote image.png  (XOR panel left {miss} points misclassified)")
+# Anchored to this file rather than the cwd, so the command the README
+# documents (`python3 src/figure.py`, run from the post root) writes the
+# image beside the post instead of one directory above it.
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "image.png")
+fig.savefig(OUT, dpi=155)
+print(f"wrote {os.path.normpath(OUT)}  (XOR panel left {miss} points misclassified)")
