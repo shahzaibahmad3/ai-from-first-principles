@@ -293,9 +293,8 @@ disagree.
 
 ---
 
-**Next → attention.** Everything so far has been one unit, stacked. The mechanism that made these models
-into something you can talk to is a different idea altogether, and it is the last piece before the whole
-picture closes.
+**Next → [Attention Has No Idea What Order Your Words Are In.](https://shahzaibahmad3.github.io/ai-from-first-principles/attention/)** — shuffle the tokens and the output is identical to fifteen decimal places, because there is no position
+in the formula at all.
 
 **Play with it yourself:** [shahzaibahmad3.github.io/ai-from-first-principles/depth/](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/)
 **Full code:** [github.com/shahzaibahmad3/ai-from-first-principles](https://github.com/shahzaibahmad3/ai-from-first-principles)

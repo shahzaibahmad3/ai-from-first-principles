@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shuffle the tokens and nothing happens</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:#EEF1F4; --panel:#FFFFFF; --panel-2:#F4F6F9; --grid:#D7DDE5; --axis:#B7C0CB;
+    --ink:#16202B; --muted:#5A6A78; --hair:#DCE2E9;
+    --c1:#DE8B27; --c0:#2E6FB0;
+    --c1-fill:rgba(222,139,39,0.12); --c0-fill:rgba(46,111,176,0.10);
+    --accent:#DE8B27; --good:#1F8A5B; --bad:#C6462F;
+    --shadow:0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --grid:#1C2A36; --axis:#2A3B49;
+      --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+      --c1:#F0A840; --c0:#4C9BE0;
+      --c1-fill:rgba(240,168,64,0.15); --c0-fill:rgba(76,155,224,0.13);
+      --accent:#F0A840; --good:#35B87E; --bad:#E5674B;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg:#EEF1F4; --panel:#FFFFFF; --panel-2:#F4F6F9; --grid:#D7DDE5; --axis:#B7C0CB;
+    --ink:#16202B; --muted:#5A6A78; --hair:#DCE2E9;
+    --c1:#DE8B27; --c0:#2E6FB0; --c1-fill:rgba(222,139,39,0.12); --c0-fill:rgba(46,111,176,0.10);
+    --accent:#DE8B27; --good:#1F8A5B; --bad:#C6462F;
+    --shadow:0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --grid:#1C2A36; --axis:#2A3B49;
+    --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+    --c1:#F0A840; --c0:#4C9BE0; --c1-fill:rgba(240,168,64,0.15); --c0-fill:rgba(76,155,224,0.13);
+    --accent:#F0A840; --good:#35B87E; --bad:#E5674B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans);
+         line-height: 1.5; -webkit-font-smoothing: antialiased; padding: clamp(14px,3vw,34px); }
+  .wrap { max-width: 1160px; margin: 0 auto; }
+
+  .theme-toggle { float: right; font-family: var(--mono); font-size: 11px; letter-spacing:.1em;
+    text-transform: uppercase; border-radius: 999px; padding: 7px 13px; cursor: pointer;
+    background: var(--panel); color: var(--muted); border: 1px solid var(--hair); }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing:.22em; text-transform: uppercase;
+    color: var(--muted); display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .eyebrow::before { content:""; width:22px; height:1px; background:var(--accent); display:inline-block; }
+  h1 { font-size: clamp(23px,4vw,34px); line-height:1.1; margin:0 0 10px; letter-spacing:-.02em; text-wrap:balance; }
+  .sub { color: var(--muted); font-size: 15px; max-width: 68ch; margin: 0 0 18px; }
+  .sub b { color: var(--ink); font-weight: 600; }
+
+  .instrument { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr); gap:16px; }
+  @media (max-width: 940px) { .instrument { grid-template-columns:1fr; } }
+  .deck { display:flex; flex-direction:column; gap:12px; }
+
+  .screen-wrap { background:var(--panel); border:1px solid var(--hair); border-radius:14px;
+    box-shadow:var(--shadow); padding:14px; display:flex; flex-direction:column; gap:12px; }
+
+  .card { background:var(--panel); border:1px solid var(--hair); border-radius:14px;
+    box-shadow:var(--shadow); padding:14px; }
+  .card h2, .panel-h {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin:0 0 11px; }
+
+  /* ---------- the attention matrix ---------- */
+  .mx-scroll { overflow-x: auto; }
+  .mx { display:grid; gap:3px; font-family:var(--mono); font-size:11px;
+        font-variant-numeric:tabular-nums; min-width:340px; max-width:560px; }
+  .mx .cell { aspect-ratio:1/1; border-radius:5px; display:flex; align-items:center;
+    justify-content:center; background:var(--panel-2); border:1px solid transparent;
+    transition: background 120ms; }
+  .mx .cell.match { border-color:var(--bad); }
+  .mx .hd { color:var(--muted); font-size:9.5px; letter-spacing:.04em; display:flex;
+    align-items:center; justify-content:center; text-align:center; line-height:1.15; }
+  .mx .rowlab { color:var(--muted); font-size:9.5px; display:flex; align-items:center;
+    justify-content:flex-end; padding-right:5px; white-space:nowrap; }
+  .mx .rowlab.q { color:var(--ink); font-weight:700; }
+  .mx-axes { display:flex; justify-content:space-between; font-family:var(--mono);
+    font-size:9.5px; color:var(--muted); margin-top:2px; }
+
+  .status { font-family:var(--mono); font-size:12.5px; color:var(--muted); min-height:20px;
+    display:flex; align-items:flex-start; gap:9px; }
+  .status b { color:var(--ink); font-weight:600; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; margin-top:6px; }
+  .status.ok .dot { background:var(--good); } .status.ok { color:var(--good); }
+  .status.bad .dot { background:var(--bad); } .status.bad { color:var(--bad); }
+
+  .calc-wrap { padding-top:12px; border-top:1px solid var(--hair); }
+  pre.calc { font-family:var(--mono); font-size:11.5px; line-height:1.6; color:var(--ink);
+    background:var(--panel-2); border:1px solid var(--hair); border-radius:9px;
+    padding:10px 11px; margin:0; white-space:pre-wrap; word-break:break-word; min-height:104px; }
+  pre.calc .hi { color:var(--accent); font-weight:700; }
+  pre.calc .dim { color:var(--muted); }
+
+  /* ---------- controls ---------- */
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { flex:1 1 0; min-width:46px; font-family:var(--mono); font-size:12px;
+    text-transform:uppercase; cursor:pointer; background:var(--panel-2); color:var(--ink);
+    border:1px solid var(--hair); border-radius:9px; padding:10px 6px; }
+  .seg button:hover { border-color:var(--muted); }
+  .seg button[aria-pressed="true"] { border-color:var(--accent); background:var(--accent);
+    color:#1a1206; font-weight:700; }
+  .seg-label { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted); margin:12px 0 6px; }
+  .seg-label:first-child { margin-top:0; }
+
+  .transport { display:flex; gap:8px; }
+  .transport button { flex:1; font-family:var(--mono); font-size:12px; letter-spacing:.06em;
+    text-transform:uppercase; cursor:pointer; background:var(--panel-2); color:var(--ink);
+    border:1px solid var(--hair); border-radius:9px; padding:11px 8px; }
+  .transport button:hover { border-color:var(--muted); }
+  #run { background:var(--accent); border-color:var(--accent); color:#1a1206; font-weight:700; }
+  #run:hover { filter:brightness(1.05); }
+
+  .slider { margin-top:12px; }
+  .slider label { display:flex; justify-content:space-between; font-family:var(--mono);
+    font-size:11.5px; color:var(--muted); margin-bottom:6px; }
+  .slider label b { color:var(--ink); font-weight:600; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin:0; }
+
+  .big-btn { width:100%; font-family:var(--mono); font-size:12px; text-transform:uppercase;
+    letter-spacing:.06em; cursor:pointer; background:transparent; color:var(--ink);
+    border:1px solid var(--accent); box-shadow:inset 0 0 0 1px var(--accent);
+    border-radius:9px; padding:12px 8px; }
+  .big-btn:hover { filter:brightness(1.06); }
+  .transport button:disabled, .seg button:disabled, .big-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .hint { font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.6; margin:8px 0 0; }
+  .hint b { color:var(--ink); }
+
+  .gauges { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .gauge { background:var(--panel-2); border:1px solid var(--hair); border-radius:9px; padding:9px 10px; }
+  .gauge.wide { grid-column:1 / -1; }
+  .gauge .lab { font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); }
+  .gauge .val { font-family:var(--mono); font-size:19px; font-weight:600;
+    font-variant-numeric:tabular-nums; margin-top:3px; }
+  #g-shift.blind .val { color:var(--good); }
+  #g-shift.aware .val { color:var(--bad); }
+
+  .divider { margin-top:12px; padding-top:12px; border-top:1px solid var(--hair); }
+  .calc-label { font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  #spark { width:100%; height:42px; display:block; }
+
+  .hide { display:none !important; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  footer { margin-top:20px; padding-top:14px; border-top:1px solid var(--hair);
+    font-family:var(--mono); font-size:11.5px; color:var(--muted);
+    display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  footer a { color:var(--ink); text-decoration:none; border-bottom:1px solid var(--accent); }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
+    <div class="eyebrow">AI, from first principles &middot; part 4</div>
+    <h1>Shuffle the tokens and nothing happens</h1>
+    <p class="sub">Attention compares every token with every other token and takes a weighted average.
+      There is no position in that formula anywhere &mdash; so shuffling the input just shuffles the
+      output, <b>exactly</b>. Press <b>Shuffle the tokens</b> and watch the number stay at zero. Then turn
+      on positional encoding, or the causal mask, and watch it stop being zero.</p>
+  </header>
+
+  <div class="instrument">
+    <!-- ================= LEFT ================= -->
+    <div class="screen-wrap">
+      <div>
+        <div class="panel-h">Who attends to whom <span id="headTag"></span></div>
+        <div class="mx-scroll"><div class="mx" id="mx"></div></div>
+        <div class="mx-axes"><span>rows: the token doing the attending</span><span>columns: attended to</span></div>
+      </div>
+
+      <div class="status" id="status">
+        <span class="dot"></span><span id="statusText">Untrained. Every token is attending to
+        everything about equally.</span>
+      </div>
+
+      <div class="calc-wrap">
+        <div class="calc-label">The query's row, worked out</div>
+        <pre class="calc" id="calc"></pre>
+      </div>
+
+      <div class="card" id="readoutCard">
+        <h2>Live readout</h2>
+        <div class="gauges">
+          <div class="gauge"><div class="lab">Step</div><div class="val" id="v-step">0</div></div>
+          <div class="gauge"><div class="lab">Loss</div><div class="val" id="v-loss">&mdash;</div></div>
+          <div class="gauge"><div class="lab">Retrieval</div><div class="val" id="v-acc">&mdash;</div></div>
+          <div class="gauge"><div class="lab">Finds the key</div><div class="val" id="v-pts">&mdash;</div></div>
+        </div>
+        <div class="divider">
+          <div class="calc-label">Loss across steps (log scale)</div>
+          <canvas id="spark"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= RIGHT ================= -->
+    <div class="deck">
+      <div class="card" id="shuffleCard">
+        <h2>The order test</h2>
+        <div class="gauges">
+          <div class="gauge wide" id="g-shift">
+            <div class="lab">Largest change in the output when tokens are shuffled</div>
+            <div class="val" id="v-shift">&mdash;</div>
+          </div>
+        </div>
+        <button class="big-btn" id="shuffle" type="button" style="margin-top:11px">Shuffle the tokens</button>
+        <p class="hint" id="shuffleHint">With nothing but Q, K and V, this is zero to the last bit of a
+          double. Order simply is not an input to the mechanism.</p>
+      </div>
+
+      <div class="card">
+        <h2>What to bolt on</h2>
+        <div class="seg-label">Positional encoding</div>
+        <div class="seg" id="posSeg">
+          <button data-pos="0" aria-pressed="true">Off</button>
+          <button data-pos="1">On</button>
+        </div>
+        <div class="seg-label">Causal mask</div>
+        <div class="seg" id="maskSeg">
+          <button data-mask="0" aria-pressed="true">Off</button>
+          <button data-mask="1">On</button>
+        </div>
+        <div class="seg-label">Heads</div>
+        <div class="seg" id="headSeg">
+          <button data-heads="1" aria-pressed="true">1</button>
+          <button data-heads="2">2</button>
+          <button data-heads="4">4</button>
+        </div>
+        <div class="seg-label">Items to search</div>
+        <div class="seg" id="itemSeg">
+          <button data-items="3">3</button>
+          <button data-items="4" aria-pressed="true">4</button>
+          <button data-items="6">6</button>
+        </div>
+        <p class="hint" id="cfgHint"></p>
+      </div>
+
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="transport">
+          <button id="run" type="button">Run</button>
+          <button id="step" type="button">Step</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+        <div class="slider">
+          <label for="speed">Speed <b id="speedVal">medium</b></label>
+          <input type="range" id="speed" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="slider">
+          <label for="lr">Learning rate <b id="lrVal">0.50</b></label>
+          <input type="range" id="lr" min="5" max="150" step="5" value="50">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <span>Same head as src/attention.py &middot; backward pass gradient-checked against finite differences.</span>
+    <span>Part of <a href="../">AI, from first principles</a></span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const spark = document.getElementById("spark"), pctx = spark.getContext("2d");
+  const SP = { w: 0, h: 42 };
+
+  // ---------------------------------------------------------------- config
+  let nItems = 4, nHeads = 1, usePos = false, causal = false;
+  const N_KEYS = 6, N_VALUES = 6;
+  const D_MODEL = N_KEYS + N_VALUES;      // [ one-hot key | one-hot value ]
+  const D_HEAD = 8;                       // per head
+  const BATCH = 32;
+  const MAX_STEPS = 20000;
+  const stepsPerFrame = { 1: 1, 2: 4, 3: 12, 4: 40, 5: 120 };
+  const SPEED_NAME = ["", "one at a time", "slow", "medium", "fast", "flat out"];
+
+  let Wq = [], Wk = [], Wv = [], Wo = [];
+  let step = 0, lastLoss = null, acc = null, pts = null;
+  let running = false, seed = 1, lossHist = [], shiftValue = null;
+  let acc_ms = 0, last = 0, viewHead = 0;
+  let demo = null;                          // the example shown in the matrix
+
+  const T = () => nItems + 1;
+  const dk = () => D_HEAD * nHeads;
+
+  // ------------------------------------------------------------------ rng
+  function hash32(n) {
+    let h = n | 0;
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function normals(rnd, n) {
+    const out = [];
+    while (out.length < n) {
+      let u = 0, v = 0;
+      while (u === 0) u = rnd();
+      while (v === 0) v = rnd();
+      const r = Math.sqrt(-2 * Math.log(u));
+      out.push(r * Math.cos(2 * Math.PI * v));
+      if (out.length < n) out.push(r * Math.sin(2 * Math.PI * v));
+    }
+    return out;
+  }
+  const mat = (r, c) => Array.from({ length: r }, () => new Float64Array(c));
+
+  // ----------------------------------------------------------------- data
+  // Each item token carries a key and a value; the query carries only a key.
+  // The head has to find the item whose key matches and read off its value.
+  function makeBatch(n, rnd) {
+    const X = [], y = new Int32Array(n), keyPos = new Int32Array(n);
+    for (let b = 0; b < n; b++) {
+      const pool = [];
+      for (let i = 0; i < N_KEYS; i++) pool.push(i);
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      const keys = pool.slice(0, nItems);
+      const vals = keys.map(() => Math.floor(rnd() * N_VALUES));
+      const seq = mat(T(), D_MODEL);
+      for (let t = 0; t < nItems; t++) { seq[t][keys[t]] = 1; seq[t][N_KEYS + vals[t]] = 1; }
+      const j = Math.floor(rnd() * nItems);
+      seq[nItems][keys[j]] = 1;
+      X.push(seq); y[b] = vals[j]; keyPos[b] = j;
+    }
+    return { X, y, keyPos };
+  }
+
+  function posEnc(t, d) {
+    const pe = mat(t, d);
+    for (let p = 0; p < t; p++) for (let i = 0; i < d; i++) {
+      const ang = p / Math.pow(10000, (2 * Math.floor(i / 2)) / d);
+      pe[p][i] = i % 2 === 0 ? Math.sin(ang) : Math.cos(ang);
+    }
+    return pe;
+  }
+
+  function initWeights(s) {
+    const rnd = mulberry32(hash32(s));
+    const K = dk();
+    const g = normals(rnd, D_MODEL * K * 3 + K * N_VALUES);
+    let p = 0;
+    const take = (r, c) => { const m = mat(r, c);
+      for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) m[i][j] = g[p++];
+      return m; };
+    const s1 = 1 / Math.sqrt(D_MODEL), s2 = 1 / Math.sqrt(K);
+    Wq = take(D_MODEL, K); Wk = take(D_MODEL, K); Wv = take(D_MODEL, K); Wo = take(K, N_VALUES);
+    for (const M of [Wq, Wk, Wv]) for (const row of M) for (let j = 0; j < row.length; j++) row[j] *= s1;
+    for (const row of Wo) for (let j = 0; j < row.length; j++) row[j] *= s2;
+  }
+
+  const softmaxRow = (v) => {
+    let m = -Infinity;
+    for (const x of v) if (x > m) m = x;
+    let s = 0; const o = new Float64Array(v.length);
+    for (let i = 0; i < v.length; i++) { o[i] = Math.exp(v[i] - m); s += o[i]; }
+    for (let i = 0; i < v.length; i++) o[i] /= s;
+    return o;
+  };
+  const proj = (X, W) => {
+    const t = X.length, c = W[0].length, O = mat(t, c);
+    for (let i = 0; i < t; i++) for (let k = 0; k < W.length; k++) {
+      const x = X[i][k]; if (x === 0) continue;
+      for (let j = 0; j < c; j++) O[i][j] += x * W[k][j];
+    }
+    return O;
+  };
+
+  // ------------------------------------------------------------- forward
+  function forwardOne(seq) {
+    const t = seq.length, K = dk(), pe = usePos ? posEnc(t, D_MODEL) : null;
+    const Xin = mat(t, D_MODEL);
+    for (let i = 0; i < t; i++) for (let j = 0; j < D_MODEL; j++)
+      Xin[i][j] = seq[i][j] + (pe ? pe[i][j] : 0);
+
+    const Q = proj(Xin, Wq), Kp = proj(Xin, Wk), V = proj(Xin, Wv);
+    const scale = 1 / Math.sqrt(D_HEAD);
+    const A = [], C = mat(t, K);
+    for (let h = 0; h < nHeads; h++) {
+      const off = h * D_HEAD, Ah = [];
+      for (let i = 0; i < t; i++) {
+        const row = new Float64Array(t);
+        for (let j = 0; j < t; j++) {
+          if (causal && j > i) { row[j] = -Infinity; continue; }
+          let s = 0;
+          for (let d = 0; d < D_HEAD; d++) s += Q[i][off + d] * Kp[j][off + d];
+          row[j] = s * scale;
+        }
+        const w = softmaxRow(row);
+        Ah.push(w);
+        for (let j = 0; j < t; j++) {
+          const wj = w[j]; if (wj === 0) continue;
+          for (let d = 0; d < D_HEAD; d++) C[i][off + d] += wj * V[j][off + d];
+        }
+      }
+      A.push(Ah);
+    }
+    const read = C[t - 1];
+    const logits = new Float64Array(N_VALUES);
+    for (let j = 0; j < N_VALUES; j++) {
+      let s = 0;
+      for (let k = 0; k < dk(); k++) s += read[k] * Wo[k][j];
+      logits[j] = s;
+    }
+    return { Xin, Q, K: Kp, V, A, C, read, logits, out: C };
+  }
+
+  // ------------------------------------------------------------ backward
+  function lossAndGrads(batch) {
+    const n = batch.X.length, K = dk();
+    const gWq = mat(D_MODEL, K), gWk = mat(D_MODEL, K), gWv = mat(D_MODEL, K),
+          gWo = mat(K, N_VALUES);
+    let loss = 0;
+
+    for (let b = 0; b < n; b++) {
+      const f = forwardOne(batch.X[b]);
+      const t = f.Xin.length;
+      const P = softmaxRow(f.logits);
+      loss += -Math.log(Math.max(P[batch.y[b]], 1e-12));
+
+      const dLogits = new Float64Array(N_VALUES);
+      for (let j = 0; j < N_VALUES; j++) dLogits[j] = (P[j] - (j === batch.y[b] ? 1 : 0)) / n;
+      const dRead = new Float64Array(K);
+      for (let k = 0; k < K; k++) {
+        let s = 0;
+        for (let j = 0; j < N_VALUES; j++) { gWo[k][j] += f.read[k] * dLogits[j]; s += dLogits[j] * Wo[k][j]; }
+        dRead[k] = s;
+      }
+
+      const dQ = mat(t, K), dK = mat(t, K), dV = mat(t, K);
+      const scale = 1 / Math.sqrt(D_HEAD);
+      for (let h = 0; h < nHeads; h++) {
+        const off = h * D_HEAD, Ah = f.A[h];
+        // only the query row (t-1) was read out, so only it carries gradient
+        const i = t - 1, w = Ah[i];
+        const dA = new Float64Array(t);
+        for (let j = 0; j < t; j++) {
+          let s = 0;
+          for (let d = 0; d < D_HEAD; d++) s += dRead[off + d] * f.V[j][off + d];
+          dA[j] = s;
+          for (let d = 0; d < D_HEAD; d++) dV[j][off + d] += w[j] * dRead[off + d];
+        }
+        let dot = 0;
+        for (let j = 0; j < t; j++) dot += dA[j] * w[j];
+        for (let j = 0; j < t; j++) {
+          const dS = w[j] * (dA[j] - dot) * scale;
+          if (dS === 0) continue;
+          for (let d = 0; d < D_HEAD; d++) {
+            dQ[i][off + d] += dS * f.K[j][off + d];
+            dK[j][off + d] += dS * f.Q[i][off + d];
+          }
+        }
+      }
+      for (let i = 0; i < t; i++) for (let m = 0; m < D_MODEL; m++) {
+        const x = f.Xin[i][m]; if (x === 0) continue;
+        for (let k = 0; k < K; k++) {
+          gWq[m][k] += x * dQ[i][k];
+          gWk[m][k] += x * dK[i][k];
+          gWv[m][k] += x * dV[i][k];
+        }
+      }
+    }
+    return { loss: loss / n, gWq, gWk, gWv, gWo };
+  }
+
+  function applyGrads(g, lr) {
+    const upd = (W, G) => { for (let i = 0; i < W.length; i++) for (let j = 0; j < W[i].length; j++) W[i][j] -= lr * G[i][j]; };
+    upd(Wq, g.gWq); upd(Wk, g.gWk); upd(Wv, g.gWv); upd(Wo, g.gWo);
+  }
+
+  // ------------------------------------------------------------ evaluate
+  function evaluate(n = 240) {
+    const batch = makeBatch(n, mulberry32(hash32(4242)));
+    let right = 0, found = 0;
+    for (let b = 0; b < n; b++) {
+      const f = forwardOne(batch.X[b]);
+      let best = 0;
+      for (let j = 1; j < N_VALUES; j++) if (f.logits[j] > f.logits[best]) best = j;
+      if (best === batch.y[b]) right++;
+      // among the item tokens, does the query's weight land on the matching one?
+      const row = f.A[0][f.Xin.length - 1];
+      let am = 0;
+      for (let j = 1; j < nItems; j++) if (row[j] > row[am]) am = j;
+      if (am === batch.keyPos[b]) found++;
+    }
+    return { accuracy: right / n, findsKey: found / n };
+  }
+
+  // ------------------------------- the order test: shuffle and compare
+  function orderTest() {
+    const rnd = mulberry32(hash32(seed * 7919 + 13));
+    const { X } = makeBatch(1, rnd);
+    const seq = X[0], t = seq.length;
+    const perm = Array.from({ length: t }, (_, i) => i);
+    for (let i = t - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+
+    const a = forwardOne(seq).out;
+    const shuffled = perm.map(p => seq[p]);
+    const b = forwardOne(shuffled).out;
+    // if order is irrelevant, row i of the shuffled run equals row perm[i] of the original
+    let worst = 0;
+    for (let i = 0; i < t; i++) for (let k = 0; k < dk(); k++)
+      worst = Math.max(worst, Math.abs(b[i][k] - a[perm[i]][k]));
+    return worst;
+  }
+
+  // -------------------------------------------------------------- render
+  function refreshDemo() {
+    demo = makeBatch(1, mulberry32(hash32(7)));
+    demo.f = forwardOne(demo.X[0]);
+  }
+
+  function renderMatrix() {
+    const host = document.getElementById("mx");
+    const t = T(), A = demo.f.A[Math.min(viewHead, nHeads - 1)];
+    const labels = [];
+    for (let i = 0; i < nItems; i++) labels.push("item " + (i + 1));
+    labels.push("query");
+
+    host.style.gridTemplateColumns = `minmax(44px,auto) repeat(${t}, minmax(0,1fr))`;
+    const parts = ['<div class="hd"></div>'];
+    for (let j = 0; j < t; j++) parts.push(`<div class="hd">${labels[j]}</div>`);
+    for (let i = 0; i < t; i++) {
+      parts.push(`<div class="rowlab${i === t - 1 ? " q" : ""}">${labels[i]}</div>`);
+      for (let j = 0; j < t; j++) {
+        const v = A[i][j];
+        const shown = isFinite(v) ? v : 0;
+        const isMatch = i === t - 1 && j === demo.keyPos[0];
+        const alpha = Math.min(shown, 1);
+        parts.push(
+          `<div class="cell${isMatch ? " match" : ""}" ` +
+          `style="background:color-mix(in srgb, var(--accent) ${(alpha * 78).toFixed(1)}%, var(--panel-2))" ` +
+          `title="${labels[i]} → ${labels[j]}: ${shown.toFixed(3)}">` +
+          `${shown < 0.005 ? "" : shown.toFixed(2)}</div>`);
+      }
+    }
+    host.innerHTML = parts.join("");
+    document.getElementById("headTag").textContent =
+      nHeads > 1 ? `· head ${viewHead + 1} of ${nHeads}` : "";
+  }
+
+  function renderCalc() {
+    const t = T(), h = Math.min(viewHead, nHeads - 1);
+    const f = demo.f, i = t - 1, off = h * D_HEAD;
+    const scale = 1 / Math.sqrt(D_HEAD);
+    const raw = [], names = [];
+    for (let j = 0; j < t; j++) {
+      let s = 0;
+      for (let d = 0; d < D_HEAD; d++) s += f.Q[i][off + d] * f.K[j][off + d];
+      raw.push(causal && j > i ? -Infinity : s * scale);
+      names.push(j < nItems ? "item " + (j + 1) : "query");
+    }
+    const w = f.A[h][i];
+    const match = demo.keyPos[0];
+    const lines = [
+      `<span class="dim">the query compares itself with every token:</span>`,
+      `<span class="dim">score = (Q·K) / √${D_HEAD}      then softmax</span>`,
+      "",
+    ];
+    for (let j = 0; j < t; j++) {
+      const mk = j === match ? ' <span class="hi">← matching key</span>' : "";
+      const sc = raw[j] === -Infinity ? "  masked" : raw[j].toFixed(3).padStart(8);
+      lines.push(`${names[j].padEnd(7)} ${sc}   →  ${w[j].toFixed(3)}${mk}`);
+    }
+    lines.push("");
+    lines.push(`<span class="dim">output = Σ weight × value, then a linear readout</span>`);
+    document.getElementById("calc").innerHTML = lines.join("\n");
+  }
+
+  function drawSpark() {
+    const w = SP.w, h = SP.h;
+    pctx.clearRect(0, 0, w, h);
+    const css = getComputedStyle(document.documentElement);
+    const col = (n) => css.getPropertyValue(n).trim();
+    pctx.strokeStyle = col("--hair"); pctx.lineWidth = 1;
+    pctx.beginPath(); pctx.moveTo(0, h - 1); pctx.lineTo(w, h - 1); pctx.stroke();
+    if (lossHist.length < 2) return;
+    const LO = 1e-4, HI = 2.5;
+    const yAt = (v) => {
+      const tt = (Math.log10(Math.max(v, LO)) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO));
+      return h - 3 - Math.max(0, Math.min(1, tt)) * (h - 6);
+    };
+    pctx.strokeStyle = col("--accent"); pctx.lineWidth = 1.6;
+    pctx.beginPath();
+    lossHist.forEach((v, i) => {
+      const x = i / (lossHist.length - 1) * w;
+      i ? pctx.lineTo(x, yAt(v)) : pctx.moveTo(x, yAt(v));
+    });
+    pctx.stroke();
+  }
+
+  function fmtShift(v) {
+    if (v === null) return "—";
+    return v < 1e-12 ? v.toExponential(1) + "  (zero)" : v.toExponential(1);
+  }
+
+  function updateReadout() {
+    document.getElementById("v-step").textContent = step.toLocaleString();
+    document.getElementById("v-loss").textContent =
+      lastLoss === null ? "—" : lastLoss.toFixed(4);
+    document.getElementById("v-acc").textContent = acc === null ? "—" : Math.round(acc * 100) + "%";
+    document.getElementById("v-pts").textContent = pts === null ? "—" : Math.round(pts * 100) + "%";
+    document.getElementById("v-shift").textContent = fmtShift(shiftValue);
+    const card = document.getElementById("g-shift");
+    card.className = "gauge wide" + (shiftValue === null ? "" : (shiftValue < 1e-12 ? " blind" : " aware"));
+    document.getElementById("cfgHint").innerHTML = describe();
+    document.getElementById("shuffleHint").innerHTML = shuffleHintText();
+    renderMatrix(); renderCalc(); drawSpark();
+  }
+
+  // Tracks the config: claiming "this is zero" would be wrong the moment the reader
+  // turns on a positional signal or the mask.
+  function shuffleHintText() {
+    if (!usePos && !causal) {
+      return "With nothing but Q, K and V this is zero to the last bit of a double. " +
+             "Order simply is not an input to the mechanism.";
+    }
+    const bolted = usePos && causal ? "A positional signal and a mask are"
+                 : usePos ? "A positional signal is" : "The causal mask is";
+    return `${bolted} bolted on, so order <b>is</b> part of the input now — expect a real number. ` +
+           `Turn both off to get back to zero.`;
+  }
+
+  function describe() {
+    if (!usePos && !causal) {
+      return "Nothing bolted on. The mechanism is looking at a <b>bag</b> of tokens: shuffle them and " +
+             "the answer is identical.";
+    }
+    if (usePos && !causal) {
+      return "Positional encoding adds a different vector at each position, so two orderings are now " +
+             "two different inputs. This is how the original transformer got order.";
+    }
+    if (!usePos && causal) {
+      return "The causal mask is the <b>other</b> source of order, and it is easy to forget: if a token " +
+             "may only look backwards, then which tokens it can see is itself positional information.";
+    }
+    return "Both bolted on — a positional signal and a mask. This is a decoder layer.";
+  }
+
+  function setStatus(html, cls) {
+    document.getElementById("statusText").innerHTML = html;
+    document.getElementById("status").className = "status " + (cls || "");
+  }
+
+  // ------------------------------------------------------------ lifecycle
+  function resetRun(newSeed) {
+    running = false;
+    document.getElementById("run").textContent = "Run";
+    step = 0; lastLoss = null; acc = null; pts = null; lossHist = []; acc_ms = 0; last = 0;
+    shiftValue = null;
+    if (newSeed !== undefined) seed = newSeed;
+    initWeights(seed);
+    refreshDemo();
+    setStatus("Untrained. Every token is attending to everything about equally.", "");
+    updateReadout();
+  }
+
+  const currentLr = () => +document.getElementById("lr").value / 100;
+
+  function doSteps(k) {
+    const lr = currentLr();
+    const rnd = mulberry32(hash32(seed * 1009 + step));
+    for (let i = 0; i < k && step < MAX_STEPS; i++) {
+      const batch = makeBatch(BATCH, mulberry32(hash32(seed * 1009 + step)));
+      const g = lossAndGrads(batch);
+      applyGrads(g, lr);
+      lastLoss = g.loss;
+      step++;
+      if (step % 10 === 0 || lossHist.length === 0) lossHist.push(lastLoss);
+    }
+    const e = evaluate();
+    acc = e.accuracy; pts = e.findsKey;
+    demo.f = forwardOne(demo.X[0]);
+    if (acc >= 1 && pts >= 1) {
+      setStatus(`<b>Solved.</b> It retrieves the right value every time, and among the items its ` +
+                `attention lands on the matching key every time.`, "ok");
+    } else if (step > 0) {
+      setStatus(`Training: ${Math.round(acc * 100)}% retrieved, and it finds the matching key ` +
+                `${Math.round(pts * 100)}% of the time.`, "");
+    }
+  }
+
+  function syncButtons() {
+    const set = (id, key, val) => document.querySelectorAll(`#${id} button`).forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset[key] === String(val))));
+    set("posSeg", "pos", usePos ? 1 : 0);
+    set("maskSeg", "mask", causal ? 1 : 0);
+    set("headSeg", "heads", nHeads);
+    set("itemSeg", "items", nItems);
+  }
+
+  // ------------------------------------------------------------------ loop
+  function frame(t) {
+    if (running) {
+      if (!last) last = t;
+      acc_ms += t - last; last = t;
+      if (acc_ms >= 16) {
+        doSteps(stepsPerFrame[+document.getElementById("speed").value]);
+        acc_ms = 0; updateReadout();
+      }
+    } else { last = 0; acc_ms = 0; }
+    requestAnimationFrame(frame);
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = spark.parentElement.getBoundingClientRect();
+    SP.w = r.width;
+    spark.width = Math.round(r.width * dpr); spark.height = Math.round(SP.h * dpr);
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawSpark();
+  }
+  new ResizeObserver(resize).observe(spark.parentElement);
+
+  // --------------------------------------------------------------- wiring
+  function onSeg(id, fn) {
+    document.getElementById(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      fn(b.dataset); syncButtons(); resetRun();
+    });
+  }
+  onSeg("posSeg", d => { usePos = d.pos === "1"; });
+  onSeg("maskSeg", d => { causal = d.mask === "1"; });
+  onSeg("headSeg", d => { nHeads = +d.heads; viewHead = 0; });
+  onSeg("itemSeg", d => { nItems = +d.items; });
+
+  document.getElementById("run").addEventListener("click", (e) => {
+    if (step >= MAX_STEPS) resetRun();
+    running = !running;
+    e.currentTarget.textContent = running ? "Pause" : "Run";
+    last = 0; acc_ms = 0;
+  });
+  document.getElementById("step").addEventListener("click", () => {
+    running = false; document.getElementById("run").textContent = "Run";
+    doSteps(1); updateReadout();
+  });
+  document.getElementById("reset").addEventListener("click", () => resetRun());
+
+  document.getElementById("shuffle").addEventListener("click", () => {
+    shiftValue = orderTest();
+    const blind = shiftValue < 1e-12;
+    setStatus(blind
+      ? `Shuffled the tokens. The output moved by <b>${shiftValue.toExponential(1)}</b> — that is ` +
+        `floating-point dust, not a difference. The mechanism never saw the order.`
+      : `Shuffled the tokens. The output moved by <b>${shiftValue.toExponential(1)}</b>. Order is ` +
+        `now part of the input, so a different order is a different question.`,
+      blind ? "ok" : "bad");
+    updateReadout();
+  });
+
+  document.getElementById("speed").addEventListener("input", (e) => {
+    document.getElementById("speedVal").textContent = SPEED_NAME[+e.target.value];
+  });
+  document.getElementById("lr").addEventListener("input", (e) => {
+    document.getElementById("lrVal").textContent = (+e.target.value / 100).toFixed(2);
+  });
+  document.getElementById("mx").addEventListener("click", () => {
+    if (nHeads > 1) { viewHead = (viewHead + 1) % nHeads; updateReadout(); }
+  });
+
+  const root = document.documentElement;
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme")
+      || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    updateReadout();
+  });
+
+  // ------------------------------------------------------------------ boot
+  syncButtons();
+  resetRun();
+  resize();
+  requestAnimationFrame(frame);
+
+  // test hook
+  window.__pg = {
+    state: () => ({ nItems, nHeads, usePos, causal, step, lastLoss, acc, pts,
+                    shiftValue, seed, lossHist: lossHist.slice(),
+                    A: demo.f.A.map(h => h.map(r => Array.from(r))),
+                    keyPos: demo.keyPos[0], viewHead }),
+    setConfig: (c) => {
+      if (c.nItems !== undefined) nItems = c.nItems;
+      if (c.nHeads !== undefined) { nHeads = c.nHeads; viewHead = 0; }
+      if (c.usePos !== undefined) usePos = c.usePos;
+      if (c.causal !== undefined) causal = c.causal;
+      syncButtons(); resetRun();
+    },
+    train: (n) => { doSteps(n); updateReadout(); },
+    orderTest, evaluate, forwardOne, makeBatch, lossAndGrads,
+    weights: () => ({ Wq, Wk, Wv, Wo }),
+    lossOn: (batch) => lossAndGrads(batch).loss,
+    setLr: (v) => { document.getElementById("lr").value = String(Math.round(v * 100)); },
+    setSeed: (s) => resetRun(s),
+  };
+})();
+</script>
+</body>
+</html>

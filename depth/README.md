@@ -292,6 +292,5 @@ disagree.
 
 ---
 
-**Next → attention.** Everything so far has been one unit, stacked. The mechanism that made these models
-into something you can talk to is a different idea altogether, and it is the last piece before the whole
-picture closes.
+**Next → [Attention Has No Idea What Order Your Words Are In.](../attention/)** — shuffle the tokens and the output is identical to fifteen decimal places, because there is no position
+in the formula at all.
