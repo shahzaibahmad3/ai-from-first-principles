@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch the gradient die on the way down</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:      #EEF1F4;
+    --panel:   #FFFFFF;
+    --panel-2: #F4F6F9;
+    --grid:    #D7DDE5;
+    --axis:    #B7C0CB;
+    --ink:     #16202B;
+    --muted:   #5A6A78;
+    --hair:    #DCE2E9;
+    --c1:      #DE8B27;
+    --c0:      #2E6FB0;
+    --c1-fill: rgba(222,139,39,0.12);
+    --c0-fill: rgba(46,111,176,0.10);
+    --line:    #16202B;
+    --accent:  #DE8B27;
+    --good:    #1F8A5B;
+    --bad:     #C6462F;
+    --shadow:  0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --grid:#1C2A36; --axis:#2A3B49;
+      --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+      --c1:#F0A840; --c0:#4C9BE0; --c1-fill:rgba(240,168,64,0.15); --c0-fill:rgba(76,155,224,0.13);
+      --line:#E8EEF3; --accent:#F0A840; --good:#35B87E; --bad:#E5674B;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg:#EEF1F4; --panel:#FFFFFF; --panel-2:#F4F6F9; --grid:#D7DDE5; --axis:#B7C0CB;
+    --ink:#16202B; --muted:#5A6A78; --hair:#DCE2E9;
+    --c1:#DE8B27; --c0:#2E6FB0; --c1-fill:rgba(222,139,39,0.12); --c0-fill:rgba(46,111,176,0.10);
+    --line:#16202B; --accent:#DE8B27; --good:#1F8A5B; --bad:#C6462F;
+    --shadow:0 1px 2px rgba(16,32,43,.06), 0 8px 24px rgba(16,32,43,.06);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#0C141C; --panel:#111C26; --panel-2:#0F1922; --grid:#1C2A36; --axis:#2A3B49;
+    --ink:#E8EEF3; --muted:#8397A6; --hair:#1E2C38;
+    --c1:#F0A840; --c0:#4C9BE0; --c1-fill:rgba(240,168,64,0.15); --c0-fill:rgba(76,155,224,0.13);
+    --line:#E8EEF3; --accent:#F0A840; --good:#35B87E; --bad:#E5674B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: clamp(14px, 3vw, 34px);
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; }
+
+  .theme-toggle {
+    float: right; font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; border-radius: 999px; padding: 7px 13px; cursor: pointer;
+    background: var(--panel); color: var(--muted); border: 1px solid var(--hair);
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--accent); display: inline-block; }
+  h1 { font-size: clamp(23px, 4vw, 34px); line-height: 1.1; margin: 0 0 10px;
+       letter-spacing: -0.02em; text-wrap: balance; }
+  .sub { color: var(--muted); font-size: 15px; max-width: 68ch; margin: 0 0 18px; }
+  .sub b { color: var(--ink); font-weight: 600; }
+
+  .instrument { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(295px,1fr); gap: 16px; }
+  @media (max-width: 920px) { .instrument { grid-template-columns: 1fr; } }
+  .deck { display: flex; flex-direction: column; gap: 12px; }
+
+  .screen-wrap {
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .stack-frame {
+    position: relative; width: 100%; height: clamp(320px, 52vh, 560px);
+    border-radius: 9px; overflow: hidden; background: var(--panel-2);
+  }
+  #stack { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .below { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.25fr); gap: 10px; align-items: start; }
+  @media (max-width: 700px) { .below { grid-template-columns: 1fr; } }
+
+  .surface-frame {
+    position: relative; width: 100%; aspect-ratio: 1/1;
+    border-radius: 9px; overflow: hidden; background: var(--panel-2);
+  }
+  #surface { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .status { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 20px;
+            display: flex; align-items: flex-start; gap: 9px; }
+  .status b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; margin-top: 6px; }
+  .status.ok  .dot { background: var(--good); } .status.ok  { color: var(--good); }
+  .status.bad .dot { background: var(--bad); }  .status.bad { color: var(--bad); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--mono);
+            font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+  .card { background: var(--panel); border: 1px solid var(--hair); border-radius: 14px;
+          box-shadow: var(--shadow); padding: 14px; }
+  .card h2 {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin: 0 0 11px;
+  }
+
+  .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg button {
+    flex: 1 1 0; min-width: 44px; font-family: var(--mono); font-size: 12px;
+    text-transform: uppercase; cursor: pointer; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 9px; padding: 10px 6px;
+  }
+  .seg button:hover { border-color: var(--muted); }
+  .seg button[aria-pressed="true"] {
+    border-color: var(--accent); background: var(--accent); color: #1a1206; font-weight: 700;
+  }
+  .seg + .seg { margin-top: 8px; }
+  .seg-label { font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+               text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+  .seg-label:first-child { margin-top: 0; }
+
+  .transport { display: flex; gap: 8px; }
+  .transport button {
+    flex: 1; font-family: var(--mono); font-size: 12px; letter-spacing: .06em;
+    text-transform: uppercase; cursor: pointer; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 9px; padding: 11px 8px;
+  }
+  .transport button:hover { border-color: var(--muted); }
+  #run { background: var(--accent); border-color: var(--accent); color: #1a1206; font-weight: 700; }
+  #run:hover { filter: brightness(1.05); }
+
+  .slider { margin-top: 12px; }
+  .slider label { display: flex; justify-content: space-between; font-family: var(--mono);
+                  font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+  .slider label b { color: var(--ink); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+  .ghost-btn {
+    width: 100%; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .06em; cursor: pointer; background: transparent; color: var(--muted);
+    border: 1px solid var(--hair); border-radius: 9px; padding: 10px 8px;
+  }
+  .ghost-btn:hover { color: var(--ink); border-color: var(--muted); }
+  .transport button:disabled, .seg button:disabled, .ghost-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .transport button:disabled:hover, .seg button:disabled:hover { border-color: var(--hair); }
+  #run:disabled:hover { filter: none; }
+
+  .hint { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+  .hint b { color: var(--ink); }
+
+  .gauges { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .gauge { background: var(--panel-2); border: 1px solid var(--hair); border-radius: 9px; padding: 9px 10px; }
+  .gauge .lab { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+                text-transform: uppercase; color: var(--muted); }
+  .gauge .val { font-family: var(--mono); font-size: 17px; font-weight: 600;
+                font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .gauge.wide { grid-column: 1 / -1; }
+  #g-att.healthy .val { color: var(--good); }
+  #g-att.dying   .val { color: var(--bad); }
+
+  .divider { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); }
+  .calc-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+                text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  #spark { width: 100%; height: 44px; display: block; }
+
+  /* attenuation grid: configs x depths, measured at init so it is instant */
+  .grid-tbl { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .grid-row { display: grid; grid-template-columns: 1.5fr repeat(5, 1fr); gap: 4px; align-items: center;
+              padding: 4px 0; border-top: 1px solid var(--hair); }
+  .grid-head { display: grid; grid-template-columns: 1.5fr repeat(5, 1fr); gap: 4px;
+               font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+               color: var(--muted); margin-bottom: 3px; }
+  .grid-row .nm { color: var(--muted); font-size: 10px; line-height: 1.25; }
+  .grid-row.cur .nm { color: var(--ink); font-weight: 700; }
+  .grid-row .v { text-align: right; font-size: 10.5px; }
+  .grid-row .v.warn { color: var(--bad); font-weight: 700; }
+  .grid-row .v.good { color: var(--good); }
+
+  .hide { display: none !important; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  footer {
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--accent); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
+    <div class="eyebrow">AI, from first principles &middot; part 3</div>
+    <h1>Watch the gradient die on the way down</h1>
+    <p class="sub">Every layer the error signal passes through on its way back multiplies it by
+      something. With a sigmoid that something is <b>at most 0.25</b>. Twenty layers of that and the
+      first layer receives a number too small to matter &mdash; which is why backprop existed for
+      decades before depth worked. Each bar below is one layer's gradient, on a log scale.</p>
+  </header>
+
+  <div class="instrument">
+    <!-- ============ LEFT: the gradient stack ============ -->
+    <div class="screen-wrap">
+      <div class="stack-frame"><canvas id="stack"></canvas></div>
+      <div class="status" id="status">
+        <span class="dot"></span><span id="statusText">Ready. Press Run, then try turning ReLU on.</span>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--accent)"></span>gradient reaching this layer</span>
+        <span><span class="swatch" style="background:var(--bad)"></span>below 1e-6 &mdash; effectively frozen</span>
+        <span><span class="swatch" style="height:0;border-top:2px dashed var(--muted);border-radius:0"></span>1e-6 line</span>
+      </div>
+
+      <div class="below">
+      <div class="card">
+        <h2>What it's learning</h2>
+        <div class="surface-frame"><canvas id="surface"></canvas></div>
+        <p class="hint">Two rings. No straight line separates them, and two hidden units can't bend
+          far enough &mdash; so this needs depth to work at all.</p>
+      </div>
+      <div class="card" id="gridCard">
+        <h2>All four, every depth</h2>
+        <button class="ghost-btn" id="gridBtn" type="button">Measure the whole grid</button>
+        <div class="divider">
+          <div class="grid-tbl">
+            <div class="grid-head"><span>&nbsp;</span><span>2</span><span>5</span><span>10</span><span>20</span><span>40</span></div>
+            <div id="gridRows"></div>
+          </div>
+          <p class="hint">Attenuation = last layer's gradient &divide; layer 1's. Measured at
+            initialisation, so no training is needed and it takes no time at all.</p>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT ============ -->
+    <div class="deck">
+      <div class="card">
+        <h2>Depth</h2>
+        <div class="seg" id="depthSeg">
+          <button data-depth="2">2</button>
+          <button data-depth="5">5</button>
+          <button data-depth="10">10</button>
+          <button data-depth="20" aria-pressed="true">20</button>
+          <button data-depth="40">40</button>
+        </div>
+        <p class="hint" id="depthHint">Weight matrices, so 20 means 19 hidden layers.</p>
+      </div>
+
+      <div class="card">
+        <h2>The four fixes</h2>
+        <div class="seg-label">Activation</div>
+        <div class="seg" id="actSeg">
+          <button data-act="sigmoid" aria-pressed="true">Sigmoid</button>
+          <button data-act="relu">ReLU</button>
+        </div>
+        <div class="seg-label">Initialisation scale</div>
+        <div class="seg" id="initSeg">
+          <button data-init="naive" aria-pressed="true">N(0,1)</button>
+          <button data-init="he">He</button>
+        </div>
+        <div class="seg-label">Residual connections</div>
+        <div class="seg" id="resSeg">
+          <button data-res="0" aria-pressed="true">Off</button>
+          <button data-res="1">On</button>
+        </div>
+        <div class="seg-label">Normalisation (RMSNorm)</div>
+        <div class="seg" id="normSeg">
+          <button data-norm="0" aria-pressed="true">Off</button>
+          <button data-norm="1">On</button>
+        </div>
+        <p class="hint" id="fixHint"></p>
+      </div>
+
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="transport">
+          <button id="run" type="button">Run</button>
+          <button id="step" type="button">Step</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+        <div class="slider">
+          <label for="speed">Speed <b id="speedVal">medium</b></label>
+          <input type="range" id="speed" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="slider">
+          <label for="lr">Learning rate <b id="lrVal">0.10</b></label>
+          <input type="range" id="lr" min="1" max="60" step="1" value="10">
+        </div>
+        <button class="ghost-btn" id="reroll" type="button" style="margin-top:10px">New random init</button>
+      </div>
+
+      <div class="card" id="readoutCard">
+        <h2>Live readout</h2>
+        <div class="gauges">
+          <div class="gauge wide" id="g-att">
+            <div class="lab">Gradient at layer 1 &nbsp;/&nbsp; at the last layer</div>
+            <div class="val" id="v-att">&mdash;</div>
+          </div>
+          <div class="gauge"><div class="lab">Epoch</div><div class="val" id="v-epoch">0</div></div>
+          <div class="gauge"><div class="lab">Loss</div><div class="val" id="v-loss">&mdash;</div></div>
+          <div class="gauge"><div class="lab">Correct</div><div class="val" id="v-acc">&mdash;</div></div>
+        </div>
+        <div class="divider">
+          <div class="calc-label">Loss across epochs (log scale)</div>
+          <canvas id="spark"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <span>Same backprop as src/depth.py &middot; gradient-checked against finite differences.</span>
+    <span>Part of <a href="../">AI, from first principles</a></span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const stack = document.getElementById("stack"),  sctx = stack.getContext("2d");
+  const surf  = document.getElementById("surface"), fctx = surf.getContext("2d");
+  const spark = document.getElementById("spark"),  pctx = spark.getContext("2d");
+  const SZ = { stackW: 0, stackH: 0, surf: 0, sparkW: 0, sparkH: 44 };
+
+  const WIDTH = 16;                 // hidden width, matches src/depth.py
+  const N_PTS = 140;                // fewer than the Python's 240: this runs per frame
+  const MAX_EPOCHS = 20000;
+  const EPS = 1e-6;
+  const DEAD = 1e-6;                // below this a layer is, in practice, frozen
+  const epochsPerFrame = { 1: 1, 2: 3, 3: 10, 4: 30, 5: 90 };
+  const SPEED_NAME = ["", "one at a time", "slow", "medium", "fast", "flat out"];
+  const DEPTHS = [2, 5, 10, 20, 40];
+
+  // ------------------------------------------------------------------ state
+  let depth = 20, act = "sigmoid", initMode = "naive", residual = false, norm = false;
+  let W = [], B = [];
+  let gradNorms = [], fwdRms = 0;
+  let epoch = 0, lastLoss = null, acc = null, running = false;
+  let seed = 1, lossHist = [];
+  let acc_ms = 0, last = 0;
+  let gridResult = null, measuring = false;
+  let points = [];
+
+  // ------------------------------------------------------------------ rng
+  // Consecutive seeds from a small LCG-ish generator are correlated, which would
+  // quietly bias anything measured across re-rolls. Mix the seed first.
+  function hash32(n) {
+    let h = n | 0;
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function normals(rnd, n) {
+    const out = [];
+    while (out.length < n) {
+      let u = 0, v = 0;
+      while (u === 0) u = rnd();
+      while (v === 0) v = rnd();
+      const r = Math.sqrt(-2 * Math.log(u));
+      out.push(r * Math.cos(2 * Math.PI * v));
+      if (out.length < n) out.push(r * Math.sin(2 * Math.PI * v));
+    }
+    return out;
+  }
+
+  // ----------------------------------------------------------------- data
+  function makeRings() {
+    const rnd = mulberry32(hash32(99)), pts = [];
+    for (let i = 0; i < N_PTS; i++) {
+      const inner = i % 2 === 0;
+      const a = rnd() * Math.PI * 2;
+      const r = inner ? 0.05 + rnd() * 0.23 : 0.45 + rnd() * 0.25;
+      pts.push({ x: 0.5 + r * Math.cos(a), y: 0.5 + r * Math.sin(a), t: inner ? 1 : 0 });
+    }
+    return pts;
+  }
+
+  // ----------------------------------------------------------------- net
+  const sig = (z) => z >= 0 ? 1 / (1 + Math.exp(-z))
+                            : (() => { const e = Math.exp(z); return e / (1 + e); })();
+
+  function dims() {
+    const d = [2];
+    for (let i = 0; i < depth - 1; i++) d.push(WIDTH);
+    d.push(1);
+    return d;
+  }
+
+  function scaleFor(fanIn, fanOut) {
+    if (initMode === "naive") return 1.0;
+    return Math.sqrt(2.0 / fanIn);                       // He
+  }
+
+  function initWeights(s) {
+    const rnd = mulberry32(hash32(s));
+    const d = dims();
+    W = []; B = [];
+    for (let i = 0; i < depth; i++) {
+      const fi = d[i], fo = d[i + 1], sc = scaleFor(fi, fo);
+      const flat = normals(rnd, fi * fo);
+      const m = [];
+      for (let r = 0; r < fi; r++) {
+        const row = new Float64Array(fo);
+        for (let c = 0; c < fo; c++) row[c] = flat[r * fo + c] * sc;
+        m.push(row);
+      }
+      W.push(m); B.push(new Float64Array(fo));
+    }
+  }
+
+  // Forward over the whole batch, keeping everything backward needs.
+  function forward() {
+    const n = points.length;
+    let a = [];
+    for (let k = 0; k < n; k++) a.push(Float64Array.from([points[k].x, points[k].y]));
+
+    const aIn = [], zs = [], raws = [], skipped = [], preN = [], rr = [];
+    for (let i = 0; i < depth; i++) {
+      aIn.push(a);
+      const fo = W[i][0].length, fi = W[i].length;
+      const z = [], out = [];
+      for (let k = 0; k < n; k++) {
+        const zk = new Float64Array(fo);
+        for (let c = 0; c < fo; c++) {
+          let s = B[i][c];
+          for (let r = 0; r < fi; r++) s += a[k][r] * W[i][r][c];
+          zk[c] = s;
+        }
+        z.push(zk);
+      }
+      zs.push(z);
+
+      if (i === depth - 1) {
+        raws.push(null); skipped.push(false); preN.push(null); rr.push(null);
+        for (let k = 0; k < n; k++) out.push(Float64Array.from([sig(z[k][0])]));
+        a = out;
+        continue;
+      }
+
+      const raw = [];
+      for (let k = 0; k < n; k++) {
+        const rk = new Float64Array(fo);
+        for (let c = 0; c < fo; c++) rk[c] = act === "sigmoid" ? sig(z[k][c]) : Math.max(z[k][c], 0);
+        raw.push(rk);
+      }
+      raws.push(raw);
+
+      const skip = residual && fo === aIn[i][0].length;
+      skipped.push(skip);
+      let t = [];
+      for (let k = 0; k < n; k++) {
+        const tk = new Float64Array(fo);
+        for (let c = 0; c < fo; c++) tk[c] = skip ? raw[k][c] + aIn[i][k][c] : raw[k][c];
+        t.push(tk);
+      }
+
+      if (norm && fo === WIDTH) {
+        const rs = new Float64Array(n);
+        preN.push(t);
+        const nt = [];
+        for (let k = 0; k < n; k++) {
+          let ss = 0;
+          for (let c = 0; c < fo; c++) ss += t[k][c] * t[k][c];
+          const r = Math.sqrt(ss / fo + EPS); rs[k] = r;
+          const v = new Float64Array(fo);
+          for (let c = 0; c < fo; c++) v[c] = t[k][c] / r;
+          nt.push(v);
+        }
+        rr.push(rs); t = nt;
+      } else { preN.push(null); rr.push(null); }
+      a = t;
+    }
+    return { out: a, aIn, zs, raws, skipped, preN, rr };
+  }
+
+  // Backward. Mirrors DeepNet.backward in src/depth.py, including the factor of 2
+  // from d/dout of mean((out-y)^2) and the identity route through every skip.
+  function backward(F) {
+    const n = points.length;
+    const dW = new Array(depth), dB = new Array(depth), norms = new Array(depth);
+
+    let G = [];
+    for (let k = 0; k < n; k++) {
+      G.push(Float64Array.from([2 * (F.out[k][0] - points[k].t) / n]));
+    }
+
+    for (let i = depth - 1; i >= 0; i--) {
+      const fi = W[i].length, fo = W[i][0].length;
+      let dz;
+
+      if (i === depth - 1) {
+        dz = [];
+        for (let k = 0; k < n; k++) {
+          const o = F.out[k][0];
+          dz.push(Float64Array.from([G[k][0] * o * (1 - o)]));
+        }
+      } else {
+        if (F.preN[i]) {                                  // undo RMSNorm
+          const x = F.preN[i], r = F.rr[i], Gn = [];
+          for (let k = 0; k < n; k++) {
+            let dot = 0;
+            for (let c = 0; c < fo; c++) dot += G[k][c] * x[k][c];
+            const v = new Float64Array(fo);
+            for (let c = 0; c < fo; c++) {
+              v[c] = G[k][c] / r[k] - x[k][c] * dot / (fo * r[k] * r[k] * r[k]);
+            }
+            Gn.push(v);
+          }
+          G = Gn;
+        }
+        dz = [];
+        for (let k = 0; k < n; k++) {
+          const v = new Float64Array(fo);
+          for (let c = 0; c < fo; c++) {
+            v[c] = act === "sigmoid"
+              ? G[k][c] * F.raws[i][k][c] * (1 - F.raws[i][k][c])
+              : G[k][c] * (F.zs[i][k][c] > 0 ? 1 : 0);
+          }
+          dz.push(v);
+        }
+      }
+
+      const gW = [];
+      for (let r = 0; r < fi; r++) gW.push(new Float64Array(fo));
+      const gB = new Float64Array(fo);
+      for (let k = 0; k < n; k++) {
+        for (let c = 0; c < fo; c++) {
+          const d = dz[k][c];
+          if (d === 0) continue;
+          gB[c] += d;
+          for (let r = 0; r < fi; r++) gW[r][c] += F.aIn[i][k][r] * d;
+        }
+      }
+      dW[i] = gW; dB[i] = gB;
+      let sq = 0;
+      for (let r = 0; r < fi; r++) for (let c = 0; c < fo; c++) sq += gW[r][c] * gW[r][c];
+      norms[i] = Math.sqrt(sq);
+
+      if (i > 0) {
+        const Gn = [];
+        for (let k = 0; k < n; k++) {
+          const v = new Float64Array(fi);
+          for (let r = 0; r < fi; r++) {
+            let s = 0;
+            for (let c = 0; c < fo; c++) s += dz[k][c] * W[i][r][c];
+            v[r] = s;
+          }
+          if (F.skipped[i]) for (let r = 0; r < fi; r++) v[r] += G[k][r];
+          Gn.push(v);
+        }
+        G = Gn;
+      }
+    }
+    return { dW, dB, norms };
+  }
+
+  let velW = [], velB = [];
+  function resetVelocity() {
+    velW = W.map(m => m.map(row => new Float64Array(row.length)));
+    velB = B.map(b => new Float64Array(b.length));
+  }
+
+  function metrics(F) {
+    const n = points.length;
+    let se = 0, right = 0, ss = 0, cnt = 0;
+    for (let k = 0; k < n; k++) {
+      const o = F.out[k][0], e = o - points[k].t;
+      se += e * e;
+      if ((o > 0.5 ? 1 : 0) === points[k].t) right++;
+    }
+    const lastIn = F.aIn[depth - 1];
+    for (let k = 0; k < n; k++) for (let c = 0; c < lastIn[k].length; c++) { ss += lastIn[k][c] ** 2; cnt++; }
+    return { loss: se / n, accuracy: right / n, rms: Math.sqrt(ss / Math.max(cnt, 1)) };
+  }
+
+  function measureOnly() {
+    const F = forward();
+    const b = backward(F);
+    gradNorms = b.norms;
+    const m = metrics(F);
+    fwdRms = m.rms; acc = m.accuracy;
+    return m;
+  }
+
+  function trainEpoch(lr) {
+    const F = forward();
+    const b = backward(F);
+    gradNorms = b.norms;
+    const mom = 0.9;
+    for (let i = 0; i < depth; i++) {
+      for (let r = 0; r < W[i].length; r++) {
+        for (let c = 0; c < W[i][r].length; c++) {
+          velW[i][r][c] = mom * velW[i][r][c] + b.dW[i][r][c];
+          W[i][r][c] -= lr * velW[i][r][c];
+        }
+      }
+      for (let c = 0; c < B[i].length; c++) {
+        velB[i][c] = mom * velB[i][c] + b.dB[i][c];
+        B[i][c] -= lr * velB[i][c];
+      }
+    }
+    const m = metrics(F);
+    fwdRms = m.rms; acc = m.accuracy;
+    return m.loss;
+  }
+
+  const attenuation = () => {
+    if (!gradNorms.length || gradNorms[0] === 0) return null;   // null = dead
+    return gradNorms[gradNorms.length - 1] / gradNorms[0];
+  };
+
+  // -------------------------------------------------------------- drawing
+  function col(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function drawStack() {
+    const w = SZ.stackW, h = SZ.stackH;
+    sctx.clearRect(0, 0, w, h);
+    if (!gradNorms.length) return;
+
+    const LO = 1e-13, HI = 1e0;
+    const logSpan = Math.log10(HI) - Math.log10(LO);
+    const padL = 62, padR = 54, padT = 20, padB = 24;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const n = gradNorms.length;
+    const rowH = plotH / n;
+    const barH = Math.max(2, Math.min(rowH - 2, 16));
+    const cAcc = col("--accent"), cBad = col("--bad"), cMut = col("--muted"), cHair = col("--hair");
+
+    // decade gridlines
+    sctx.strokeStyle = cHair; sctx.lineWidth = 1;
+    sctx.font = `9px ${col("--mono") || "monospace"}`;
+    sctx.fillStyle = cMut;
+    for (let e = -12; e <= 0; e += 4) {
+      const x = padL + (Math.log10(Math.pow(10, e)) - Math.log10(LO)) / logSpan * plotW;
+      sctx.beginPath(); sctx.moveTo(x, padT - 6); sctx.lineTo(x, padT + plotH); sctx.stroke();
+      sctx.textAlign = "center";
+      sctx.fillText(`1e${e}`, x, padT - 10);
+    }
+
+    // the "effectively frozen" threshold
+    const xDead = padL + (Math.log10(DEAD) - Math.log10(LO)) / logSpan * plotW;
+    sctx.save();
+    sctx.strokeStyle = cBad; sctx.globalAlpha = .55; sctx.setLineDash([3, 3]);
+    sctx.beginPath(); sctx.moveTo(xDead, padT - 6); sctx.lineTo(xDead, padT + plotH); sctx.stroke();
+    sctx.restore();
+
+    // one bar per layer: last layer (nearest the loss) at the top, so the eye
+    // travels the same direction the gradient does
+    for (let i = 0; i < n; i++) {
+      const layer = n - 1 - i;                    // top row = last layer
+      const g = gradNorms[layer];
+      const y = padT + i * rowH + (rowH - barH) / 2;
+      const frac = g <= 0 ? 0
+        : Math.max(0, Math.min(1, (Math.log10(g) - Math.log10(LO)) / logSpan));
+      const bw = Math.max(g > 0 ? 1.5 : 0, frac * plotW);
+
+      sctx.fillStyle = col("--panel");
+      sctx.fillRect(padL, y, plotW, barH);
+      sctx.fillStyle = (g > 0 && g < DEAD) || g === 0 ? cBad : cAcc;
+      sctx.globalAlpha = g === 0 ? .5 : 1;
+      sctx.fillRect(padL, y, bw, barH);
+      sctx.globalAlpha = 1;
+
+      if (rowH >= 11) {
+        sctx.fillStyle = cMut; sctx.textAlign = "right";
+        sctx.font = `9.5px ${col("--mono") || "monospace"}`;
+        const nm = layer === n - 1 ? "out" : (layer === 0 ? "L1" : "L" + (layer + 1));
+        sctx.fillText(nm, padL - 8, y + barH - 1);
+        sctx.textAlign = "left";
+        sctx.fillText(g === 0 ? "0" : g.toExponential(0).replace("e", "e"), padL + plotW + 6, y + barH - 1);
+      }
+    }
+
+    // The two end labels collide once the plot is narrow (they overlap at 375px),
+    // so drop to short forms rather than letting them overprint each other.
+    const [leftLab, rightLab] = plotW < 360
+      ? ["loss end", "input end"]
+      : ["nearest the loss", "layer 1 — furthest from the loss"];
+    sctx.fillStyle = cMut; sctx.textAlign = "left";
+    sctx.font = `9px ${col("--mono") || "monospace"}`;
+    sctx.fillText(leftLab, padL, padT + plotH + 14);
+    sctx.textAlign = "right";
+    sctx.fillText(rightLab, padL + plotW, padT + plotH + 14);
+  }
+
+  const SURF_RES = 44;
+  let surfBuf = null;
+  function drawSurface() {
+    const s = SZ.surf;
+    fctx.clearRect(0, 0, s, s);
+    const D0 = -0.05, D1 = 1.05, span = D1 - D0;
+    const c1 = hexToRgb(col("--c1")), c0 = hexToRgb(col("--c0"));
+
+    if (!surfBuf) surfBuf = fctx.createImageData(SURF_RES, SURF_RES);
+    // reuse the trained weights on a grid of probe points
+    const savedPts = points;
+    const probe = [];
+    for (let j = 0; j < SURF_RES; j++) {
+      for (let i = 0; i < SURF_RES; i++) {
+        probe.push({ x: D0 + (i + .5) / SURF_RES * span, y: D1 - (j + .5) / SURF_RES * span, t: 0 });
+      }
+    }
+    points = probe;
+    const out = forward().out;
+    points = savedPts;
+
+    const d = surfBuf.data;
+    for (let k = 0; k < out.length; k++) {
+      const o = out[k][0], c = o > 0.5 ? c1 : c0, p = k * 4;
+      d[p] = c[0]; d[p + 1] = c[1]; d[p + 2] = c[2];
+      d[p + 3] = Math.round(Math.min(Math.abs(o - .5) * 2, 1) * 78);
+    }
+    const tmp = document.createElement("canvas");
+    tmp.width = SURF_RES; tmp.height = SURF_RES;
+    tmp.getContext("2d").putImageData(surfBuf, 0, 0);
+    fctx.imageSmoothingEnabled = true;
+    fctx.drawImage(tmp, 0, 0, s, s);
+
+    for (const p of points) {
+      const px = (p.x - D0) / span * s, py = (D1 - p.y) / span * s;
+      fctx.beginPath(); fctx.arc(px, py, 2.6, 0, Math.PI * 2);
+      fctx.fillStyle = col(p.t ? "--c1" : "--c0"); fctx.fill();
+    }
+  }
+
+  function hexToRgb(h) {
+    h = h.trim(); if (h[0] === "#") h = h.slice(1);
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+
+  function drawSpark() {
+    const w = SZ.sparkW, h = SZ.sparkH;
+    pctx.clearRect(0, 0, w, h);
+    pctx.strokeStyle = col("--hair"); pctx.lineWidth = 1;
+    pctx.beginPath(); pctx.moveTo(0, h - 1); pctx.lineTo(w, h - 1); pctx.stroke();
+    if (lossHist.length < 2) return;
+    const LO = 1e-4, HI = 0.35;
+    const yAt = (v) => {
+      const t = (Math.log10(Math.max(v, LO)) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO));
+      return h - 3 - Math.max(0, Math.min(1, t)) * (h - 6);
+    };
+    pctx.strokeStyle = col("--accent"); pctx.lineWidth = 1.6;
+    pctx.beginPath();
+    lossHist.forEach((v, i) => {
+      const x = i / (lossHist.length - 1) * w;
+      i ? pctx.lineTo(x, yAt(v)) : pctx.moveTo(x, yAt(v));
+    });
+    pctx.stroke();
+  }
+
+  function draw() { drawStack(); drawSurface(); drawSpark(); }
+
+  // -------------------------------------------------------------- readout
+  function fmtAtt(a) {
+    if (a === null) return "dead — exactly zero";
+    if (a >= 1000) return a.toExponential(1) + "×";
+    if (a >= 10) return a.toFixed(0) + "×";
+    return a.toFixed(1) + "×";
+  }
+
+  function updateReadout() {
+    const a = attenuation();
+    document.getElementById("v-att").textContent = fmtAtt(a);
+    const card = document.getElementById("g-att");
+    card.className = "gauge wide" + (a === null || a > 100 ? " dying" : (a !== null ? " healthy" : ""));
+    document.getElementById("v-epoch").textContent = epoch.toLocaleString();
+    document.getElementById("v-loss").textContent =
+      lastLoss === null ? "—" : (lastLoss < 0.001 ? lastLoss.toExponential(1) : lastLoss.toFixed(4));
+    document.getElementById("v-acc").textContent =
+      acc === null ? "—" : Math.round(acc * 100) + "%";
+    document.getElementById("fixHint").innerHTML = describe();
+  }
+
+  // True whenever the residual-without-normalisation pathology is present, which is
+  // broader than "the gradient hit exactly zero": the activations blow up first and
+  // the gradient collapses as a consequence. At depth 20 it reaches exact zero
+  // roughly three times in four, at depth 40 every time -- but the explanation is
+  // the same either way, so key the message on the cause, not the extreme case.
+  const residualBlowup = () => residual && !norm && fwdRms > 10;
+
+  function describe() {
+    const a = attenuation();
+    if (residualBlowup() || a === null) {
+      const dead = a === null;
+      return `Residual blocks add their input back, so the activations grow with every layer ` +
+             `— here they reach an RMS of <b>${fwdRms.toExponential(1)}</b>. That saturates the ` +
+             `output, and a saturated sigmoid has almost no slope, so the gradient ` +
+             (dead ? "has collapsed to <b>exactly zero</b>" : "collapses with it") +
+             `. Turn normalisation on.`;
+    }
+    if (act === "sigmoid" && initMode === "naive" && depth >= 10) {
+      return "Sigmoid's derivative peaks at 0.25, so each layer keeps at most a quarter of what it " +
+             "was given. Try <b>ReLU</b>, whose derivative is exactly 1 wherever it is active.";
+    }
+    if (act === "relu" && initMode === "naive") {
+      return "ReLU won't help much at N(0,1): the scale is wrong for it. Try <b>He</b> init, which " +
+             "sizes the weights for an activation that zeroes half its inputs.";
+    }
+    if (act === "relu" && initMode === "he" && !residual && !norm) {
+      return "This is the 2012 recipe, and the gradient now survives the trip. Add <b>residual</b> " +
+             "connections next — and watch it get worse before it gets better.";
+    }
+    if (residual && norm) {
+      return "Residual + normalisation. This pair is what every transformer is built from, using " +
+             "the same RMSNorm as Llama and Mistral.";
+    }
+    return "Attenuation is the last layer's gradient divided by layer 1's. Closer to 1 is healthier.";
+  }
+
+  function setStatus(html, cls) {
+    document.getElementById("statusText").innerHTML = html;
+    document.getElementById("status").className = "status " + (cls || "");
+  }
+
+  // ------------------------------------------------------------ lifecycle
+  function resetRun(newSeed) {
+    running = false;
+    document.getElementById("run").textContent = "Run";
+    epoch = 0; lastLoss = null; lossHist = []; acc_ms = 0; last = 0;
+    if (newSeed !== undefined) seed = newSeed;
+    initWeights(seed);
+    resetVelocity();
+    measureOnly();
+    const a = attenuation();
+    if (a === null) {
+      setStatus("At initialisation the gradient reaching layer 1 is <b>exactly zero</b>. " +
+                "Nothing below the top can learn.", "bad");
+    } else if (residualBlowup()) {
+      setStatus(`The activations have blown up to an RMS of <b>${fwdRms.toExponential(1)}</b> on the ` +
+                `way forward, and layer 1 gets ${fmtAtt(a)} less gradient than the last layer.`, "bad");
+    } else if (gradNorms[0] < DEAD) {
+      setStatus(`At initialisation, layer 1 receives <b>${gradNorms[0].toExponential(1)}</b> ` +
+                `— ${fmtAtt(a)} smaller than the last layer. Effectively frozen.`, "bad");
+    } else {
+      setStatus(`Ready. Layer 1 receives <b>${gradNorms[0].toExponential(1)}</b>, ` +
+                `${fmtAtt(a)} smaller than the last layer.`, "");
+    }
+    lastLoss = null; acc = null;
+    updateReadout();
+  }
+
+  function currentLr() { return +document.getElementById("lr").value / 100; }
+
+  function stepEpochs(k) {
+    const lr = currentLr();
+    for (let i = 0; i < k && epoch < MAX_EPOCHS; i++) {
+      lastLoss = trainEpoch(lr);
+      epoch++;
+      if (epoch % 20 === 0 || lossHist.length === 0) lossHist.push(lastLoss);
+    }
+    if (epoch >= MAX_EPOCHS) {
+      running = false;
+      document.getElementById("run").textContent = "Run";
+      setStatus(`Stopped at ${MAX_EPOCHS.toLocaleString()} epochs. ` +
+                `${Math.round(acc * 100)}% of points correct.`,
+                acc > 0.95 ? "ok" : "bad");
+    } else if (acc !== null && acc >= 1) {
+      running = false;
+      document.getElementById("run").textContent = "Run";
+      setStatus(`<b>All points correct</b> after ${epoch.toLocaleString()} epochs.`, "ok");
+    }
+  }
+
+  function syncButtons() {
+    const set = (id, attr, val) => document.querySelectorAll(`#${id} button`).forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset[attr] === String(val))));
+    set("depthSeg", "depth", depth);
+    set("actSeg", "act", act);
+    set("initSeg", "init", initMode);
+    set("resSeg", "res", residual ? 1 : 0);
+    set("normSeg", "norm", norm ? 1 : 0);
+  }
+
+  // ------------------------------------------------------------------ grid
+  const GRID_CFGS = [
+    { key: "sigmoid",  nm: "sigmoid<br>N(0,1)",             act: "sigmoid", init: "naive", res: false, norm: false },
+    { key: "he",       nm: "ReLU<br>+ He",                  act: "relu",    init: "he",    res: false, norm: false },
+    { key: "res",      nm: "+ residual",                    act: "relu",    init: "he",    res: true,  norm: false },
+    { key: "resnorm",  nm: "+ RMSNorm",                     act: "relu",    init: "he",    res: true,  norm: true },
+  ];
+
+  function renderGrid() {
+    const host = document.getElementById("gridRows");
+    host.innerHTML = GRID_CFGS.map(c => {
+      const isCur = c.act === act && c.init === initMode && c.res === residual && c.norm === norm;
+      const cells = DEPTHS.map(d => {
+        const v = gridResult && gridResult[c.key] ? gridResult[c.key][d] : undefined;
+        if (v === undefined) return `<span class="v">—</span>`;
+        if (v === null) return `<span class="v warn">dead</span>`;
+        const cls = v > 100 ? "warn" : (v < 20 ? "good" : "");
+        const txt = v >= 1000 ? v.toExponential(0).replace("e+", "e") : v.toFixed(0);
+        return `<span class="v ${cls}">${txt}</span>`;
+      }).join("");
+      return `<div class="grid-row ${isCur ? "cur" : ""}"><span class="nm">${c.nm}</span>${cells}</div>`;
+    }).join("");
+  }
+
+  // Init-only, so this is cheap: one forward and one backward per cell. Still
+  // chunked by config so the page never stalls, and it takes the same lock the
+  // other controls respect.
+  const LOCKABLE = ["run", "step", "reset", "reroll"];
+  function setLock(on) {
+    measuring = on;
+    LOCKABLE.forEach(id => { const e = document.getElementById(id); if (e) e.disabled = on; });
+    document.querySelectorAll(".seg button").forEach(b => { b.disabled = on; });
+  }
+
+  function measureGrid(onDone) {
+    if (measuring) return;
+    const btn = document.getElementById("gridBtn");
+    const saved = { depth, act, initMode, residual, norm, seed };
+    running = false;
+    document.getElementById("run").textContent = "Run";
+    setLock(true); btn.disabled = true;
+    gridResult = {}; renderGrid();
+
+    let ci = 0;
+    function chunk() {
+      const c = GRID_CFGS[ci];
+      const row = {};
+      for (const d of DEPTHS) {
+        depth = d; act = c.act; initMode = c.init; residual = c.res; norm = c.norm;
+        const atts = [];
+        for (const s of [1, 2, 3]) {
+          initWeights(s); measureOnly();
+          atts.push(attenuation());
+        }
+        row[d] = atts.some(v => v === null) ? null
+               : atts.sort((a, b) => a - b)[1];              // median of three
+      }
+      gridResult[c.key] = row;
+      renderGrid();
+      btn.textContent = `Measuring… ${ci + 1}/${GRID_CFGS.length}`;
+
+      if (++ci >= GRID_CFGS.length) {
+        depth = saved.depth; act = saved.act; initMode = saved.initMode;
+        residual = saved.residual; norm = saved.norm; seed = saved.seed;
+        syncButtons(); renderGrid();
+        setLock(false); btn.disabled = false; btn.textContent = "Measure again";
+        resetRun();
+        if (onDone) onDone(gridResult);
+        return;
+      }
+      setTimeout(chunk, 0);
+    }
+    setTimeout(chunk, 20);
+  }
+
+  // ------------------------------------------------------------------ loop
+  function frame(t) {
+    if (running && !measuring) {
+      if (!last) last = t;
+      acc_ms += t - last; last = t;
+      if (acc_ms >= 16) {
+        stepEpochs(epochsPerFrame[+document.getElementById("speed").value]);
+        acc_ms = 0; updateReadout();
+      }
+    } else { last = 0; acc_ms = 0; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- sizing
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const sr = stack.parentElement.getBoundingClientRect();
+    SZ.stackW = sr.width; SZ.stackH = sr.height;
+    stack.width = Math.round(sr.width * dpr); stack.height = Math.round(sr.height * dpr);
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const fr = surf.parentElement.getBoundingClientRect();
+    SZ.surf = fr.width;
+    surf.width = Math.round(fr.width * dpr); surf.height = Math.round(fr.width * dpr);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const pr = spark.parentElement.getBoundingClientRect();
+    SZ.sparkW = pr.width;
+    spark.width = Math.round(pr.width * dpr); spark.height = Math.round(SZ.sparkH * dpr);
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  new ResizeObserver(resize).observe(stack.parentElement);
+  new ResizeObserver(resize).observe(surf.parentElement);
+  new ResizeObserver(resize).observe(spark.parentElement);
+
+  // --------------------------------------------------------------- wiring
+  function onSeg(id, fn) {
+    document.getElementById(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b || measuring) return;
+      fn(b.dataset); syncButtons(); renderGrid(); resetRun();
+    });
+  }
+  onSeg("depthSeg", d => { depth = +d.depth; });
+  onSeg("actSeg",   d => { act = d.act; });
+  onSeg("initSeg",  d => { initMode = d.init; });
+  onSeg("resSeg",   d => { residual = d.res === "1"; });
+  onSeg("normSeg",  d => { norm = d.norm === "1"; });
+
+  document.getElementById("run").addEventListener("click", (e) => {
+    if (measuring) return;
+    if (epoch >= MAX_EPOCHS) resetRun();
+    running = !running;
+    e.currentTarget.textContent = running ? "Pause" : "Run";
+    last = 0; acc_ms = 0;
+  });
+  document.getElementById("step").addEventListener("click", () => {
+    if (measuring) return;
+    running = false; document.getElementById("run").textContent = "Run";
+    stepEpochs(1); updateReadout();
+  });
+  document.getElementById("reset").addEventListener("click", () => { if (!measuring) resetRun(); });
+  document.getElementById("reroll").addEventListener("click", () => {
+    if (measuring) return;
+    resetRun(seed + 1);
+  });
+  document.getElementById("gridBtn").addEventListener("click", () => measureGrid());
+
+  document.getElementById("speed").addEventListener("input", (e) => {
+    document.getElementById("speedVal").textContent = SPEED_NAME[+e.target.value];
+  });
+  document.getElementById("lr").addEventListener("input", (e) => {
+    document.getElementById("lrVal").textContent = (+e.target.value / 100).toFixed(2);
+  });
+
+  const root = document.documentElement;
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme")
+      || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+
+  // ------------------------------------------------------------------ boot
+  points = makeRings();
+  syncButtons();
+  renderGrid();
+  resetRun();
+  resize();
+  requestAnimationFrame(frame);
+
+  // test hook
+  window.__pg = {
+    state: () => ({ depth, act, initMode, residual, norm, epoch, lastLoss, acc,
+                    gradNorms: gradNorms.slice(), fwdRms, attenuation: attenuation(),
+                    lossHist: lossHist.slice(), gridResult, measuring, running, seed,
+                    nPoints: points.length }),
+    setConfig: (c) => {
+      if (c.depth !== undefined) depth = c.depth;
+      if (c.act !== undefined) act = c.act;
+      if (c.init !== undefined) initMode = c.init;
+      if (c.residual !== undefined) residual = c.residual;
+      if (c.norm !== undefined) norm = c.norm;
+      syncButtons(); resetRun();
+    },
+    trainFor: (n) => { stepEpochs(n); updateReadout(); },
+    setLr: (v) => { document.getElementById("lr").value = String(Math.round(v * 100)); },
+    measureGrid, measureOnly, forward, backward, attenuation,
+    // exposed so the test suite can finite-difference this backward pass the same
+    // way src/depth.py checks its own
+    weights: () => ({ W, B }),
+    lossNow: () => {
+      const F = forward();
+      let se = 0;
+      for (let k = 0; k < points.length; k++) se += (F.out[k][0] - points[k].t) ** 2;
+      return se / points.length;
+    },
+  };
+})();
+</script>
+</body>
+</html>

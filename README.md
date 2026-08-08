@@ -12,6 +12,7 @@ code behind it, no libraries, no magic.
 |---|------|------|
 | 1 | [The Neuron — the unit an LLM is built from](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/) | [`neuron/`](neuron/) |
 | 2 | [XOR Was Never the Hard Part. Finding the Weights Was.](https://shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/) | [`finding-the-weights/`](finding-the-weights/) |
+| 3 | [Stacking Was the Easy Part. Getting the Gradient Back Down Wasn't.](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/) | [`depth/`](depth/) |
 
 More parts land here as the series continues.
 

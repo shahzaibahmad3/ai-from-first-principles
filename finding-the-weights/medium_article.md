@@ -297,7 +297,7 @@ never disagree. Every number quoted above comes out of one of these scripts.
 
 ---
 
-**Next → the part where stacking these stops working, and what had to be invented before depth paid off.**
+**Next → [Stacking Was the Easy Part. Getting the Gradient Back Down Wasn't.](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/)** — at forty layers the first one receives one part in 1.7 billion of the gradient, and every fix that made depth work is arithmetic on signal size.
 
 **Play with it yourself:** [shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/](https://shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/)
 **Full code:** [github.com/shahzaibahmad3/ai-from-first-principles](https://github.com/shahzaibahmad3/ai-from-first-principles)
