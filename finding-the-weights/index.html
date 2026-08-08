@@ -189,6 +189,15 @@
 
   .hint { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
 
+  /* The sweep owns the weights while it runs, so the controls that touch them are
+     locked. Make that read as deliberate rather than as a broken button. */
+  .transport button:disabled, .presets button:disabled, .seg button:disabled {
+    opacity: .4; cursor: not-allowed;
+  }
+  .transport button:disabled:hover, .presets button:disabled:hover,
+  .seg button:disabled:hover { border-color: var(--hair); }
+  #run:disabled:hover { filter: none; }
+
   /* ---------- readout ---------- */
   .gauges { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .gauge { background: var(--panel-2); border: 1px solid var(--hair); border-radius: 9px; padding: 9px 10px; }
@@ -461,6 +470,10 @@
   let byHand = false;               // showing the hand-built weights
   let attempts = 0, wins = 0;       // the lottery tally
   let sweepResult = null;           // {2: rate, 3: rate, ...}
+  // The sweep yields between chunks, so unlike a blocking loop it can be interrupted.
+  // It owns the weights and H while it runs, so everything that touches those has to
+  // stand down until it finishes.
+  let sweeping = false;
   let plateauRef = null, plateauAt = 0;
   let acc_ms = 0, last = 0;
 
@@ -1040,7 +1053,9 @@
     const host = document.getElementById("sweepRows");
     const widths = [2, 3, 4, 8];
     host.innerHTML = widths.map(w => {
-      const r = sweepResult ? sweepResult[w] : null;
+      // == null, not === null: the sweep fills widths in one at a time, so the
+      // ones not yet measured are absent rather than explicitly null.
+      const r = sweepResult && sweepResult[w] != null ? sweepResult[w] : null;
       const pct = r === null ? "—" : Math.round(r * 100) + "%";
       const fill = r === null ? 0 : r * 100;
       return `<div class="sweep-row ${w === H ? "cur" : ""}"><span class="n">${w}</span>` +
@@ -1049,42 +1064,87 @@
     }).join("");
   }
 
-  // Runs headless — no rendering, no rAF — so 400 full trainings finish in well
-  // under a second on a 9-parameter network.
-  function runSweep() {
-    const btn = document.getElementById("sweepBtn");
-    btn.disabled = true; btn.textContent = "Running…";
-    const savedH = H, savedPts = points;
+  // 400 full trainings is several seconds of arithmetic. Doing it in one go pins the
+  // main thread and the page just freezes, so it runs in small chunks with a yield
+  // between them: the button counts up and each width's bar lands as it finishes.
+  // Budget per chunk rather than a fixed run count: a fast machine gets through more
+  // trainings before yielding, a slow one fewer, and either way the page comes back
+  // to life about ten times a second. A fixed count would be too coarse on slow
+  // hardware and needlessly chatty on fast.
+  const SWEEP_WIDTHS = [2, 3, 4, 8], SWEEP_N = 100, SWEEP_BUDGET_MS = 100;
 
-    setTimeout(() => {
-      const widths = [2, 3, 4, 8], N = 100, res = {};
-      for (const w of widths) {
-        let ok = 0;
-        for (let s = 0; s < N; s++) {
-          H = w; initWeights(1000 + s);
-          let ref = null, refAt = 0, l = 0;
-          for (let e = 1; e <= MAX_EPOCHS; e++) {
-            l = trainEpoch();
-            if (ref === null || l < ref - 1e-7) { ref = l; refAt = e; }
-            if (e > 3000 && e - refAt > 1500) break;
-            if (l < solveLoss()) break;      // same bar as a single run
-          }
-          if (solvedAt(l)) ok++;
-        }
-        res[w] = ok / N;
+  // One headless training run at width w. The stopping rules are deliberately the
+  // same ones stepOneEpoch uses, including the *relative* plateau test — otherwise
+  // the sweep would be measuring a slightly different question than the re-roll
+  // button next to it.
+  function sweepRun(w, s) {
+    H = w;
+    initWeights(1000 + s);
+    let ref = null, refAt = 0, l = 0;
+    for (let e = 1; e <= MAX_EPOCHS; e++) {
+      l = trainEpoch();
+      if (ref === null || l < ref * (1 - 1e-5)) { ref = l; refAt = e; }
+      if (e > 3000 && e - refAt > 1500) break;
+      if (l < solveLoss()) break;
+    }
+    return solvedAt(l);
+  }
+
+  // Controls that read or write the weights, disabled for the duration of a sweep.
+  const LOCKABLE = ["run", "step", "reset", "reroll", "byHand"];
+  function setSweepLock(on) {
+    sweeping = on;
+    LOCKABLE.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = on; });
+    document.querySelectorAll("#presets button, #widthToggle button")
+      .forEach(b => { b.disabled = on; });
+  }
+
+  function runSweep(onDone) {
+    if (sweeping) return;
+    const btn = document.getElementById("sweepBtn");
+    const savedH = H;
+    running = false;
+    document.getElementById("run").textContent = "Run";
+    setSweepLock(true);
+    btn.disabled = true;
+    sweepResult = null;
+    renderSweep();
+
+    const res = {};
+    let wi = 0, si = 0, ok = 0;
+
+    function chunk() {
+      const w = SWEEP_WIDTHS[wi];
+      const deadline = performance.now() + SWEEP_BUDGET_MS;
+      while (si < SWEEP_N && performance.now() < deadline) {
+        if (sweepRun(w, si)) ok++;
+        si++;
       }
-      sweepResult = res;
-      H = savedH; points = savedPts;
-      initWeights(seed);
-      renderSweep();
-      btn.disabled = false; btn.textContent = "Run again";
-      resetRun();
-    }, 30);
+      btn.textContent = `Running… ${w} hidden · ${si}/${SWEEP_N}`;
+
+      if (si >= SWEEP_N) {
+        res[w] = ok / SWEEP_N;
+        sweepResult = { ...res };          // copy so renderSweep sees each width land
+        renderSweep();
+        wi++; si = 0; ok = 0;
+        if (wi >= SWEEP_WIDTHS.length) {
+          H = savedH;
+          renderSweep();                   // re-render so "cur" marks the real width
+          setSweepLock(false);
+          btn.disabled = false; btn.textContent = "Run again";
+          resetRun();
+          if (onDone) onDone(sweepResult);
+          return;
+        }
+      }
+      setTimeout(chunk, 0);
+    }
+    setTimeout(chunk, 30);
   }
 
   // ---------------------------------------------------------------- loop
   function frame(t) {
-    if (running) {
+    if (running && !sweeping) {
       if (!last) last = t;
       acc_ms += t - last; last = t;
       // Advance a fixed number of epochs per frame rather than per millisecond;
@@ -1126,35 +1186,40 @@
   }
 
   document.getElementById("run").addEventListener("click", (e) => {
+    if (sweeping) return;
     if (solved || stuck) resetRun(seed + 1);
     running = !running;
     e.currentTarget.textContent = running ? "Pause" : "Run";
     last = 0; acc_ms = 0;
   });
   document.getElementById("step").addEventListener("click", () => {
+    if (sweeping) return;
     running = false;
     document.getElementById("run").textContent = "Run";
     stepEpoch(); updateReadout(); pulseBackward();
   });
-  document.getElementById("reset").addEventListener("click", () => resetRun());
+  document.getElementById("reset").addEventListener("click", () => { if (!sweeping) resetRun(); });
 
   document.getElementById("presets").addEventListener("click", (e) => {
+    if (sweeping) return;
     const b = e.target.closest("button"); if (b) loadSet(b.dataset.set);
   });
   document.getElementById("widthToggle").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b) return;
+    const b = e.target.closest("button"); if (!b || sweeping) return;
     H = +b.dataset.h; syncWidthButtons();
     attempts = 0; wins = 0;
     renderTally(); renderSweep(); resetRun();
   });
 
   document.getElementById("reroll").addEventListener("click", () => {
+    if (sweeping) return;
     resetRun(seed + 1);
     running = true;
     document.getElementById("run").textContent = "Pause";
   });
 
   document.getElementById("byHand").addEventListener("click", () => {
+    if (sweeping) return;
     resetRun();
     loadHandBuilt();
     byHand = true;
@@ -1168,7 +1233,8 @@
     buildDiagram(); updateReadout();
   });
 
-  document.getElementById("sweepBtn").addEventListener("click", runSweep);
+  // Wrapped, not passed directly: the click event must not arrive as onDone.
+  document.getElementById("sweepBtn").addEventListener("click", () => runSweep());
 
   document.getElementById("speed").addEventListener("input", (e) => {
     document.getElementById("speedVal").textContent = SPEED_NAME[+e.target.value];
@@ -1194,7 +1260,7 @@
   // test hook
   window.__pg = {
     state: () => ({ H, setName, epoch, lastLoss, solved, stuck, byHand, attempts, wins,
-                    lossHist, sweepResult, points, seed,
+                    lossHist, sweepResult, points, seed, sweeping, running,
                     outs: points.map(p => forward(p.x, p.y).out) }),
     setSeed: (s) => resetRun(s),
     setWidth: (h) => { H = h; syncWidthButtons(); resetRun(); },

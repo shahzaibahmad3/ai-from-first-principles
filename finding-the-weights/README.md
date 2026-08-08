@@ -137,17 +137,30 @@ get there, at wildly different times.
 
 ### What failure actually looks like
 
-The failures aren't noise. They have a signature, and it's oddly human.
-[`src/inspect_stuck.py`](src/inspect_stuck.py) retrains the failing seeds and prints their outputs:
+The failures aren't noise. They have a signature, and it's oddly human. Thirteen of those 60 traced runs
+never solved it; [`src/inspect_stuck.py`](src/inspect_stuck.py) retrains them and prints what they
+actually output. Here is the whole list, unabridged:
 
 ```
+13 of 60 runs failed to solve XOR
+
  seed  final loss   outputs
+----------------------------------------------------------
+    5      0.1673   [0.335  0.977  0.332  0.334]
     6      0.1254   [0.020  0.499  0.984  0.500]
    13      0.1254   [0.019  0.983  0.500  0.501]
+   18      0.1254   [0.017  0.984  0.499  0.500]
    21      0.1254   [0.018  0.500  0.982  0.501]
-   ...
-    5      0.1673   [0.335  0.977  0.332  0.334]
+   27      0.1254   [0.015  0.982  0.500  0.501]
+   28      0.1254   [0.017  0.499  0.983  0.501]
+   34      0.1254   [0.014  0.500  0.981  0.501]
+   40      0.1254   [0.014  0.500  0.977  0.501]
    50      0.1671   [0.020  0.666  0.666  0.667]
+   53      0.1255   [0.015  0.500  0.978  0.501]
+   54      0.1254   [0.016  0.500  0.984  0.501]
+   56      0.1254   [0.016  0.500  0.983  0.501]
+
+median final loss among the failures: 0.12541
 ```
 
 Eleven of the thirteen do the same thing. They learn two of the four points confidently — 0.02 where the
@@ -177,11 +190,11 @@ This is an optimisation story from beginning to end. And it isn't a historical c
 and it trains more reliably" is durable practical folklore in deep learning, and a nine-parameter network
 is the smallest place I know of to watch the mechanism behind it.
 
-> Try it in the playground: **Run 100 inits × 4 widths** runs the whole sweep in your browser in about a
-> second and rebuilds that table live. It uses its own random number generator rather than NumPy's, so
-> the exact per-seed values differ — but it lands on the same rates, because the rates are a property of
-> the problem, not of the generator. Switch to **Rings** for the contrast: there, width buys genuine
-> capacity, because two units really can't bend far enough.
+> Try it in the playground: **Run 100 inits × 4 widths** reruns that whole table in your browser — 400
+> trainings, a few seconds, filling in a width at a time. It uses its own random number generator rather
+> than NumPy's, so the exact per-seed values differ — but it lands on the same rates, because the rates
+> are a property of the problem, not of the generator. Switch to **Rings** for the contrast: there, width
+> buys genuine capacity, because two hidden units give you two lines, and no two lines enclose a blob.
 
 ---
 
@@ -267,7 +280,7 @@ python3 src/credit_assignment.py   # 1,200 training runs -- about 8 minutes
 python3 src/inspect_stuck.py       # what the failures actually output
 python3 src/figure.py              # regenerates image.png from results.json
 
-open index.html                    # the interactive version, no install
+open index.html                  # the interactive version, no install
 ```
 
 `credit_assignment.py` writes `results.json`; `figure.py` reads it, so the figure and the table can
