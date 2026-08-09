@@ -5,7 +5,7 @@ Attention is usually introduced as a formula to memorise. It is a soft dictionar
 lookup: every token proposes a query, every token advertises a key, the two are
 compared, and the result is a weighted average of the values. That is all.
 
-    A = softmax(Q Kᵀ / √d)      who to listen to
+    A = softmax(Q Kᵀ / √d_k)    who to listen to   (d_k = one head's key width)
     out = A V                   listen to them
 
 Backpropagation through it is written out longhand here -- no autograd -- because

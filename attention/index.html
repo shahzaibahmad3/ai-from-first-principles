@@ -272,7 +272,7 @@
   </div>
 
   <footer>
-    <span>Same head as src/attention.py &middot; backward pass gradient-checked against finite differences.</span>
+    <span>Same maths as src/attention.py, extended to several heads &middot; backward pass gradient-checked against finite differences.</span>
     <span>Part of <a href="../">AI, from first principles</a></span>
   </footer>
 </div>
@@ -297,6 +297,10 @@
   let Wq = [], Wk = [], Wv = [], Wo = [];
   let step = 0, lastLoss = null, acc = null, pts = null;
   let running = false, seed = 1, lossHist = [], shiftValue = null;
+  // At the top of the learning-rate range, with several heads, this can blow up.
+  // Once the weights are NaN nothing recovers, so latch it and say so rather than
+  // printing NaN into every readout and pretending training is still going.
+  let diverged = false;
   let acc_ms = 0, last = 0, viewHead = 0;
   let demo = null;                          // the example shown in the matrix
 
@@ -516,6 +520,7 @@
 
   // ------------------------------- the order test: shuffle and compare
   function orderTest() {
+    if (diverged) return null;
     const rnd = mulberry32(hash32(seed * 7919 + 13));
     const { X } = makeBatch(1, rnd);
     const seq = X[0], t = seq.length;
@@ -529,7 +534,7 @@
     let worst = 0;
     for (let i = 0; i < t; i++) for (let k = 0; k < dk(); k++)
       worst = Math.max(worst, Math.abs(b[i][k] - a[perm[i]][k]));
-    return worst;
+    return isFinite(worst) ? worst : null;
   }
 
   // -------------------------------------------------------------- render
@@ -568,6 +573,12 @@
   }
 
   function renderCalc() {
+    if (diverged) {
+      document.getElementById("calc").innerHTML =
+        '<span class="dim">The weights overflowed, so there is no arithmetic left to show.\n' +
+        'Press Reset and lower the learning rate.</span>';
+      return;
+    }
     const t = T(), h = Math.min(viewHead, nHeads - 1);
     const f = demo.f, i = t - 1, off = h * D_HEAD;
     const scale = 1 / Math.sqrt(D_HEAD);
@@ -624,10 +635,12 @@
 
   function updateReadout() {
     document.getElementById("v-step").textContent = step.toLocaleString();
-    document.getElementById("v-loss").textContent =
-      lastLoss === null ? "—" : lastLoss.toFixed(4);
-    document.getElementById("v-acc").textContent = acc === null ? "—" : Math.round(acc * 100) + "%";
-    document.getElementById("v-pts").textContent = pts === null ? "—" : Math.round(pts * 100) + "%";
+    const num = (v, fmt) => (v === null ? "—" : (isFinite(v) ? fmt(v) : "diverged"));
+    document.getElementById("v-loss").textContent = num(lastLoss, v => v.toFixed(4));
+    document.getElementById("v-acc").textContent =
+      diverged ? "—" : num(acc, v => Math.round(v * 100) + "%");
+    document.getElementById("v-pts").textContent =
+      diverged ? "—" : num(pts, v => Math.round(v * 100) + "%");
     document.getElementById("v-shift").textContent = fmtShift(shiftValue);
     const card = document.getElementById("g-shift");
     card.className = "gauge wide" + (shiftValue === null ? "" : (shiftValue < 1e-12 ? " blind" : " aware"));
@@ -675,7 +688,7 @@
     running = false;
     document.getElementById("run").textContent = "Run";
     step = 0; lastLoss = null; acc = null; pts = null; lossHist = []; acc_ms = 0; last = 0;
-    shiftValue = null;
+    shiftValue = null; diverged = false;
     if (newSeed !== undefined) seed = newSeed;
     initWeights(seed);
     refreshDemo();
@@ -686,14 +699,22 @@
   const currentLr = () => +document.getElementById("lr").value / 100;
 
   function doSteps(k) {
+    if (diverged) return;
     const lr = currentLr();
-    const rnd = mulberry32(hash32(seed * 1009 + step));
     for (let i = 0; i < k && step < MAX_STEPS; i++) {
       const batch = makeBatch(BATCH, mulberry32(hash32(seed * 1009 + step)));
       const g = lossAndGrads(batch);
       applyGrads(g, lr);
       lastLoss = g.loss;
       step++;
+      if (!isFinite(lastLoss)) {
+        diverged = true; running = false;
+        document.getElementById("run").textContent = "Run";
+        setStatus(`<b>Diverged.</b> The learning rate is too high for this configuration, so the ` +
+                  `weights have overflowed and every number below is now meaningless. Press ` +
+                  `<b>Reset</b> and try a smaller learning rate.`, "bad");
+        return;
+      }
       if (step % 10 === 0 || lossHist.length === 0) lossHist.push(lastLoss);
     }
     const e = evaluate();
@@ -766,6 +787,12 @@
 
   document.getElementById("shuffle").addEventListener("click", () => {
     shiftValue = orderTest();
+    if (shiftValue === null) {
+      setStatus("<b>Diverged.</b> There is nothing meaningful to measure until you press " +
+                "<b>Reset</b>.", "bad");
+      updateReadout();
+      return;
+    }
     const blind = shiftValue < 1e-12;
     setStatus(blind
       ? `Shuffled the tokens. The output moved by <b>${shiftValue.toExponential(1)}</b> — that is ` +

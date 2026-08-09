@@ -94,7 +94,7 @@ fig, (axL, axR) = plt.subplots(1, 2, figsize=(10.6, 5.1),
 
 # ---- left: the learned attention matrix
 labels = [f"item {i+1}" for i in range(N_ITEMS)] + ["query"]
-im = axL.imshow(A_trained, cmap="pink_r", vmin=0, vmax=1, aspect="equal")
+axL.imshow(A_trained, cmap="pink_r", vmin=0, vmax=1, aspect="equal")
 axL.set_xticks(range(N_ITEMS + 1)); axL.set_xticklabels(labels, fontsize=8.6, rotation=30)
 axL.set_yticks(range(N_ITEMS + 1)); axL.set_yticklabels(labels, fontsize=8.6)
 axL.set_xlabel("attends to", fontsize=9.6)
@@ -127,7 +127,7 @@ names = [c[0] for c in CASES]
 vals = [max(perm[n]["out_max"], 1e-16) for n in names]
 eps = float(np.finfo(np.float64).eps)
 colours = [style.BLUE if v < 1e-12 else style.RUST for v in vals]
-bars = axR.barh(range(len(names)), vals, color=colours, height=.55, edgecolor="none")
+axR.barh(range(len(names)), vals, color=colours, height=.55, edgecolor="none")
 axR.set_yticks(range(len(names)))
 axR.set_yticklabels(names, fontsize=9.4)
 axR.invert_yaxis()
@@ -148,7 +148,7 @@ axR.set_axisbelow(True)
 fig.suptitle("Attention has no idea what order your words are in.",
              x=.012, ha="left", fontsize=13.5, y=.985)
 fig.text(.012, .925,
-         "A = softmax(Q Kᵀ / √d) compares every token with every other and never asks where either one "
+         "A = softmax(Q Kᵀ / √d_k) compares every token with every other and never asks where either one "
          "sits. Order arrives separately — as a positional signal, or as a mask.",
          ha="left", fontsize=9.8, color=style.INK_SOFT, style="italic")
 style.credit(fig, f"measured: src/attention.py, src/permutation.py · one head, "

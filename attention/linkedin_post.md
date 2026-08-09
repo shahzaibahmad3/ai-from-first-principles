@@ -6,7 +6,7 @@ Machine epsilon for a 64-bit float is 2.2e-16. That's about thirteen rounding er
 
 Look at the formula and it's obvious:
 
-    A   = softmax(Q Kᵀ / √d)
+    A   = softmax(Q Kᵀ / √d_k)
     out = A V
 
 Every token projects a query (what am I looking for), a key (what do I advertise), and a value (what I hand over if you listen). Compare every query to every key, softmax, take the weighted average.
@@ -27,7 +27,7 @@ One more thing. "Attention Is All You Need" is about what attention REPLACED —
 
 And attention isn't where the computation lives. Per layer: attention is 4d², the feed-forward sublayer is 8d². Exactly 2:1, for any width. GPT-3: 58B parameters of attention, 116B of feed-forward.
 
-Those feed-forward layers hold 4,718,592 neurons — exactly the "about five million" I quoted in part 1. Four posts in, the umbrella decision is still the unit, and still where most of the model lives.
+Those feed-forward layers hold 4,718,592 neurons — the "millions of times over" from part 1, made exact. Four posts in, the umbrella decision is still the unit, and still where most of the model lives.
 
 Attention decides which tokens get to talk. The neurons do the thinking about what they said.
 

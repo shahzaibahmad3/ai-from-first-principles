@@ -89,7 +89,7 @@ if __name__ == "__main__":
     print("the last bit of a double: shuffling the tokens shuffles the output rows")
     print("and changes nothing else, and the attention matrix is the very same")
     print("matrix with its rows and columns permuted.")
-    print("\nThere is no index in the formula. A = softmax(Q Kᵀ / √d) compares every")
+    print("\nThere is no index in the formula. A = softmax(Q Kᵀ / √d_k) compares every")
     print("token with every other token and never asks where either of them sits.")
     print("\nBoth of the other two rows are large, and that is the real lesson: a")
     print("transformer gets its sense of order from things bolted on beside the")

@@ -55,7 +55,7 @@ matrix*, with its rows and columns permuted to match. Same numbers, moved.
 Here is the whole mechanism:
 
 ```
-A   = softmax(Q Kᵀ / √d)        who to listen to
+A   = softmax(Q Kᵀ / √d_k)      who to listen to
 out = A V                       listen to them
 ```
 
@@ -69,10 +69,12 @@ only what those two tokens contain — never where either of them sits. It is a 
 over an unordered bag, and being blind to order isn't a flaw in the implementation; it is what the
 formula says.
 
-The √d is worth a sentence, since it looks arbitrary. Dot products of *d*-dimensional vectors grow like
-√d, and a softmax over large numbers saturates into a hard argmax with almost no gradient — exactly the
-dead end from [Part 3](../depth/). Dividing by √d keeps the scores in the range
-where softmax still has a usable slope. It is the same "get the signal size right" move, again.
+The √d_k is worth a sentence, since it looks arbitrary. **d_k here is the width of one head's key
+vector** — not the width of the model, which I'll call d further down; for GPT-3 those are 128 and 12,288
+respectively, so it matters which one you mean. Dot products of d_k-dimensional vectors grow like √d_k,
+and a softmax over large numbers saturates into a hard argmax with almost no gradient — exactly the dead
+end from [Part 3](../depth/). Dividing by √d_k keeps the scores in the range where
+softmax still has a usable slope. It is the same "get the signal size right" move, again.
 
 ---
 
@@ -162,9 +164,9 @@ Llama-2 70B (GQA)          12.1B         56.4B      82.4%    4.67:1 (gated)
 ```
 
 58 billion parameters of attention and 116 billion of feed-forward. And those feed-forward layers are
-where the *neurons* are: `4d × layers` for GPT-3 is **4,718,592** — which is exactly the "about five
-million neurons" Part 1 opened with. Four posts later, the umbrella decision is still the unit, and it is
-still where most of the model lives.
+where the *neurons* are: `4d × layers` for GPT-3 is **4,718,592**. Part 1 opened by saying the unit is
+"repeated millions of times over"; that is the number it cashes out to. Four posts later, the umbrella
+decision is still the unit, and it is still where most of the model lives.
 
 Attention is the part that decides **which** tokens get to talk to each other. The neurons are what
 actually does the thinking about what they said.
@@ -202,7 +204,7 @@ python3 src/permutation.py    # the order test: plain, with positions, with a ma
 python3 src/budget.py         # where the parameters actually live
 python3 src/figure.py         # regenerates results.json and image.png
 
-open index.html               # the interactive version, no install
+open index.html          # the interactive version, no install
 ```
 
 `figure.py` writes `results.json`, and every number quoted above is read back out of it, so the prose

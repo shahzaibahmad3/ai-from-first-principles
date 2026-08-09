@@ -87,8 +87,8 @@ if __name__ == "__main__":
     neurons = 4 * g3["d"] * g3["layers"]
     print(f"\nAnd those feed-forward layers are where the neurons are: "
           f"4d x layers = {neurons:,}")
-    print("which is the 'about five million neurons' from part 1. Same units, all")
-    print("the way back to the umbrella.")
+    print("which is what part 1's 'repeated millions of times over' cashes out to.")
+    print("Same units, all the way back to the umbrella.")
 
     print("\nEvery modern change pushes the same way: gated feed-forward layers use")
     print("three matrices instead of two, and grouped-query attention shrinks the")
