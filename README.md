@@ -11,20 +11,16 @@ code behind it, no libraries, no magic.
 | # | Post | Code |
 |---|------|------|
 | 1 | [The Neuron — the unit an LLM is built from](https://shahzaibahmad3.github.io/ai-from-first-principles/neuron/) | [`neuron/`](neuron/) |
-| 2 | [XOR Was Never the Hard Part. Finding the Weights Was.](https://shahzaibahmad3.github.io/ai-from-first-principles/finding-the-weights/) | [`finding-the-weights/`](finding-the-weights/) |
-| 3 | [Stacking Was the Easy Part. Getting the Gradient Back Down Wasn't.](https://shahzaibahmad3.github.io/ai-from-first-principles/depth/) | [`depth/`](depth/) |
-| 4 | [Attention Has No Idea What Order Your Words Are In.](https://shahzaibahmad3.github.io/ai-from-first-principles/attention/) | [`attention/`](attention/) |
 
-More parts land here as the series continues.
+More parts land here as they're posted.
 
 ## Running a post locally
 
 Each post folder is self-contained:
 
 ```bash
-cd finding-the-weights
+cd neuron
 open index.html                    # the playground, no install needed
 pip install -r requirements.txt
-python3 src/capacity.py            # hand-built XOR, no training
-python3 src/credit_assignment.py   # the 1,200-run experiment
+python3 src/neuron.py              # the 23-line reference implementation
 ```

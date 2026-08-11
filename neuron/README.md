@@ -180,4 +180,4 @@ But it all starts with one line, moving until it's right.
 
 ---
 
-**Next → [XOR Was Never the Hard Part. Finding the Weights Was.](../finding-the-weights/)** — the hidden layer that bends the boundary, and the 1,200 training runs showing that finding the weights, not representing the answer, was the real wall.
+**Next → Finding the Weights.** Coming soon.
