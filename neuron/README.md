@@ -180,4 +180,4 @@ But it all starts with one line, moving until it's right.
 
 ---
 
-**Next → Finding the Weights.** Coming soon.
+**Next up:** how you actually bend that one straight line. Coming soon.
